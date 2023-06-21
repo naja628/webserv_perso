@@ -15,7 +15,10 @@ Server::Server(VirtualServers const& conf)
 
 //Server::Server(const Server& other) {}
 Server::~Server() {
-	std::cerr << "server dtor" << std::endl;
+	std::cerr << "server dtor\n";
+	for (size_t i = 0; i < _m_fds.size(); ++i) {
+		close( _m_fds[i].fd );
+	}
 }
 
 Server Server::operator= (const Server& other)
