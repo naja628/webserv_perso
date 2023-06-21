@@ -134,13 +134,9 @@ short ConState::_dispatch() {
 
 	if ( _pa.method() == "DELETE" )
 	{
-		std::string filename = _pa.uri().substr( _pa.uri().rfind('/') + 1 );
-		std::ifstream target( (path_conf->uploads_directory() + filename).data() );
-		if (!target.is_open())
-			throw HttpError(400);
-		bool failed = std::remove( (path_conf->uploads_directory() + filename).data() );
+		bool failed = std::remove( (_pconf->translate_path(_pa.uri())).data() );
 		if (failed)
-			throw HttpError(500);
+			throw HttpError(404);
 
 		_wr.reset();
 		_wr.set_status(204);
