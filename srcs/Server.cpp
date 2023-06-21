@@ -81,7 +81,7 @@ void Server::launchServer(void)
 			{
 				cli_sock = accept(_m_fds[current].fd, (struct sockaddr*) &cli_addr, &cli_addr_size);	// accepte la connection et cree la socket
 				if (cli_sock == -1)
-					throw ConnectionAcceptException();
+					continue;
 
 				std::cout << "new connection on fd: " << cli_sock << std::endl;
 				_m_addFd(cli_sock);	// rajoute la nouvelle socket
