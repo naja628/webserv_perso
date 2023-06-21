@@ -1,4 +1,5 @@
 #include "Server.hpp"
+#include "Quit.hpp"
 #include <unistd.h>
 #include <string.h>
 #include <sys/types.h>
@@ -14,7 +15,10 @@ Server::Server(VirtualServers const& conf)
 
 //Server::Server(const Server& other) {}
 Server::~Server() {
-	std::cerr << "server dtor" << std::endl;
+	std::cerr << "server dtor\n";
+	for (size_t i = 0; i < _m_fds.size(); ++i) {
+		close( _m_fds[i].fd );
+	}
 }
 
 Server Server::operator= (const Server& other)
@@ -72,6 +76,8 @@ void Server::launchServer(void)
 	while (1)
 	{
 		events = poll(_m_fds.data(), _m_fds.size(), 5000);	// poll: check les eventuelles connections
+		if ( Quit::set() )
+			return ;
 		if (events == -1)
 			throw PollErrorException();
 
@@ -81,7 +87,7 @@ void Server::launchServer(void)
 			{
 				cli_sock = accept(_m_fds[current].fd, (struct sockaddr*) &cli_addr, &cli_addr_size);	// accepte la connection et cree la socket
 				if (cli_sock == -1)
-					throw ConnectionAcceptException();
+					continue;
 
 				std::cout << "new connection on fd: " << cli_sock << std::endl;
 				_m_addFd(cli_sock);	// rajoute la nouvelle socket
