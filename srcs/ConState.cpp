@@ -244,6 +244,25 @@ std::string	ConState::_dir_list(DIR *dir, std::string path)
 	return (str_buf);
 }
 
+short ConState::_prepare_cgi_page()
+{
+// std::map cgi_header = _cgi.parseHeader()
+
+	std::string	tmp_str = _cgi.fileToStr();
+	_wr.set_status(200);
+	_wr.add_header_field("content-type", "text/html");
+	_wr.use_as_body(tmp_str);
+	_call_next = &ConState::_write;
+	return POLLOUT;
+}
+
+short ConState::_wait_cgi() {
+	if (_cgi.waitChild() == true)
+		return POLLOUT; // still parsing
+	else
+		return _prepare_cgi_page();
+}
+
 short ConState::_prepare_page() {
 	std::cerr << "_prepare_page\n";
 
@@ -260,15 +279,9 @@ short ConState::_prepare_page() {
 	_cgi.setRoot(locpath);	// dans isCgi()
 	if (_cgi.isCgi() == true)
 	{
-		std::string	tmp_str = _cgi.run();	// un POST renvoie uniquement le status code
-std::cerr << "RESPONSE:\n" << tmp_str << '\n';
-		_wr.set_status(200);
-		if (_cgi.getMethod() == "GET") {
-			_wr.add_header_field("content-type", "text/html");
-			_wr.use_as_body(tmp_str);
-		}
-		_call_next = &ConState::_write;
-		return POLLOUT;
+		_cgi.run();	// un POST renvoie uniquement le status code
+		_call_next = &ConState::_wait_cgi;
+		return (_wait_cgi());
 	}
 
 	// response common part:

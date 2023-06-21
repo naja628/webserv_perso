@@ -3,6 +3,7 @@
 #include <fstream>
 #include <sstream>
 #include <cstdio>
+#include <ctime>
 #include <poll.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -11,11 +12,13 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <signal.h>
 
 #include "CgiHandler.hpp"
 #include "Buf.hpp"
-#include "HttpParser.hpp"
 #include "Conf.hpp"
+#include "HttpParser.hpp"
+#include "HttpError.hpp"
 
 /****************************************************/
 /*                                                  */
@@ -23,7 +26,7 @@
 /*                                                  */
 /****************************************************/
 // default
-CgiHandler::CgiHandler() : _envTab(NULL)
+CgiHandler::CgiHandler() : _stopwatch(0)
 {}
 
 // copy
@@ -40,10 +43,7 @@ CgiHandler::CgiHandler(const CgiHandler &src)
 /****************************************************/
 CgiHandler::~CgiHandler()
 {
-	std::cerr << "cgi dtor" << std::endl;
 	rmFile();
-	if (_envTab) 
-		_freeTab();
 }
 
 
@@ -55,28 +55,12 @@ CgiHandler::~CgiHandler()
 CgiHandler	&CgiHandler::operator=(const CgiHandler &src)
 {
 	_pa = src._pa;
-	_env = src._env;
 	_header = src._header;
 	_method = src._method;
 	_fileBuf = src._fileBuf;
 	_fileExec = src._fileExec;
 	_root = src._root;
-	_header = src._header;
-	_env = src._env;
-	_envTab = src._envTab;
-	// problem in general case for `_envTab`, `_fs_file`
 	return (*this);
-}
-
-
-/****************************************************/
-/*                                                  */
-/*                  GETTERS                         */
-/*                                                  */
-/****************************************************/
-std::string	CgiHandler::getMethod() const
-{
-	return (_method);
 }
 
 
@@ -214,77 +198,34 @@ void	CgiHandler::clearDirectory(std::string dirPath)
 /*                                                  */
 /****************************************************/
 
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <unistd.h>
-#include <string.h>
-#include <signal.h>
-
-/*
-std::string	CgiHandler::run()
+bool	CgiHandler::waitChild()
 {
-std::cerr << "_in_cgi\n";
-
-	int	timeout = 5;
-	int	kill_signal = SIGKILL;
-
-    pid_t intermediate_pid = fork();
-	if(intermediate_pid < 0)
-		return NULL;	// error
-	if (intermediate_pid == 0)
+	int	wstatus;
+	if (!waitpid(_pid, &wstatus, WNOHANG))
 	{
-		pid_t worker_pid = fork();
-		if (worker_pid < 0)
-			return NULL;	// error
-		if (worker_pid == 0)
-			_launch();
-
-		pid_t timeout_pid = fork();
-		if (timeout_pid == 0)
+		if ((((float)(clock() - _stopwatch)) / CLOCKS_PER_SEC) >= CGI_TIMEOUT)
 		{
-			sleep(timeout);
-			exit(0);
+			kill(_pid, SIGKILL);
+			throw HttpError(504);
 		}
-
-		pid_t exited_pid = wait(NULL);
-		if (exited_pid == worker_pid)
-			kill(timeout_pid, SIGKILL);
-		else
-			kill(worker_pid, kill_signal);
-
-		wait(NULL); // Collect the other process	// convert waitpid
-		exit(0); // Or some more informative status
+		return true;
 	}
 
-	int	wstatus;
-	waitpid(intermediate_pid, &wstatus, 0);	// change '0'
 std::cerr << "------> wstatus = " << WEXITSTATUS(wstatus) << '\n';
-
-	if (wstatus)
-		return NULL;	// error
-
-	return (_fileToStr());
+	return false;
 }
-*/
 
-std::string	CgiHandler::run()
+void	CgiHandler::run()
 {
 std::cerr << "_in_cgi\n";
 	int pid;
 
+	_stopwatch = clock();
 	pid = fork();
 	if (pid < 0)
-		return NULL;	// error
+		throw HttpError(500);
 	if (!pid)
 		_launch();
-
-	int	wstatus;
-	waitpid(pid, &wstatus, 0);	// change '0'	// WNOHANG
-std::cerr << "------> wstatus = " << WEXITSTATUS(wstatus) << '\n';
-	if (wstatus)
-		return "";	// error
-
-	return (_fileToStr());
 }
 
 bool	CgiHandler::isCgi()
@@ -329,17 +270,17 @@ std::cerr << "Couldn't change directory\n";
 		_exit(fd1, fd2);
 	}
 
-	_setEnv(fd1, fd2);	// close les fd
+	char	**envTab = _setEnv(fd1, fd2);	// close les fd
 
 	char *tab[2];
 	tab[0] = (char *)path.substr(path.find_last_of('/') + 1).c_str();
 	tab[1] = NULL;
 
 std::cerr << "-> exec to: " << tab[0] << '\n';
-	execve(path.substr(path.find_last_of('/') + 1).c_str(), tab, _envTab);	// change path, because of chdir()	// path.c_str()
+	execve(path.substr(path.find_last_of('/') + 1).c_str(), tab, envTab);	// change path, because of chdir()	// path.c_str()
 std::cerr << "-> couldn't execute\n\n";
 
-	_freeTab();
+	_freeTab(envTab);
 	_exit(fd1, fd2);
 }
 
@@ -353,7 +294,7 @@ bool	CgiHandler::_checkExtension(std::string path)
 	return false;
 }
 
-std::string	CgiHandler::_fileToStr()
+std::string	CgiHandler::fileToStr()
 {
 	std::ifstream		ifs(_fileExec.data());
 	std::stringstream	buf;
@@ -399,50 +340,54 @@ bool	CgiHandler::setFilename()	// throw a la place de return
 	return 1;
 }
 
-void	CgiHandler::_setEnv(int fd1, int fd2)	// traduire les "./"	// exit a la place de return
+char	**CgiHandler::_setEnv(int fd1, int fd2)	// traduire les "./"	// exit a la place de return
 {
-	_env["AUTH_TYPE"] = "";
-	_env["CONTENT_LENGTH"] = _fileSize();
-	_env["CONTENT_TYPE"] = _getFromHeader("content-type");
-	_env["GATEWAY_INTERFACE"] = "CGI/1.1";
+	std::map<std::string, std::string>	env;
+	char								**envTab;
 
-	_env["PATH_INFO"] = _getPathInfo();
-	_env["PATH_TRANSLATED"] = "";	// locPath
+	env["AUTH_TYPE"] = "";
+	env["CONTENT_LENGTH"] = _fileSize();
+	env["CONTENT_TYPE"] = _getFromHeader("content-type");
+	env["GATEWAY_INTERFACE"] = "CGI/1.1";
 
-	_env["QUERY_STRING"] = (_getStrInfo(_pa.uri(), '?', 1) != "" ?
+	env["PATH_INFO"] = _getPathInfo();
+	env["PATH_TRANSLATED"] = "";	// locPath
+
+	env["QUERY_STRING"] = (_getStrInfo(_pa.uri(), '?', 1) != "" ?
 		_getStrInfo(_pa.uri(), '?', 1) : _getStrInfo(_pa.uri(), ';', 1));
 
-	_env["REMOTE_ADDR"] = "";	// from cli_sock in Server.cpp
-	_env["REMOTE_HOST"] = _getFromHeader("host");	// localhost:port
+	env["REMOTE_ADDR"] = "";	// from cli_sock in Server.cpp
+	env["REMOTE_HOST"] = _getFromHeader("host");	// localhost:port
 
-	_env["REQUEST_METHOD"] = _method;
-	_env["SCRIPT_NAME"] = _getPath(1);	// /cgi-bin/process.php	// problem while print (".")
-	_env["SCRIPT_FILENAME"] = _getPath(0);	// _root + getPath();	// root + script_name
-	_env["SERVER_NAME"] = _getStrInfo(_getFromHeader("host"), ':', 0);
-	_env["SERVER_PORT"] = _getStrInfo(_getFromHeader("host"), ':', 1);
-	_env["SERVER_PROTOCOL"] = "HTTP/1.1";
-	_env["SERVER_SOFTWARE"] = "spiderweb";	// spiderweb
+	env["REQUEST_METHOD"] = _method;
+	env["SCRIPT_NAME"] = _getPath(1);	// /cgi-bin/process.php	// problem while print (".")
+	env["SCRIPT_FILENAME"] = _getPath(0);	// _root + getPath();	// root + script_name
+	env["SERVER_NAME"] = _getStrInfo(_getFromHeader("host"), ':', 0);
+	env["SERVER_PORT"] = _getStrInfo(_getFromHeader("host"), ':', 1);
+	env["SERVER_PROTOCOL"] = "HTTP/1.1";
+	env["SERVER_SOFTWARE"] = "spiderweb";	// spiderweb
 
 	int	i = 0;
-	_envTab = (char **)malloc(sizeof(char *) * (_env.size() + 1));
-	if (!_envTab)
+	envTab = (char **)malloc(sizeof(char *) * (env.size() + 1));
+	if (!envTab)
 		_exit(fd1, fd2);
-	for (std::map<std::string, std::string>::iterator it = _env.begin(); it != _env.end(); it++)
+	for (std::map<std::string, std::string>::iterator it = env.begin(); it != env.end(); it++)
 	{
 		std::string	tmpStr = it->first + "=" + it->second;
-		_envTab[i] = (char *)malloc(sizeof(char) * (tmpStr.length() + 1));
-		if (!_envTab[i])
+		envTab[i] = (char *)malloc(sizeof(char) * (tmpStr.length() + 1));
+		if (!envTab[i])
 		{
 			for (int j = 0; j < i; j++)
-				free (_envTab[j]);
-			free (_envTab);
+				free (envTab[j]);
+			free (envTab);
 			_exit(fd1, fd2);
 		}
-		strcpy(_envTab[i], tmpStr.c_str());
+		strcpy(envTab[i], tmpStr.c_str());
 		i++;
 	}
-	_envTab[_env.size()] = NULL;
+	envTab[env.size()] = NULL;
 std::cerr << "env created\n";
+	return (envTab);
 }
 
 
@@ -561,16 +506,14 @@ std::string	CgiHandler::_getPath(int method)
 	return "";
 }
 
-void	CgiHandler::_freeTab()
+void	CgiHandler::_freeTab(char **envTab)
 {
-	if (!_envTab)
+	if (!envTab)
 		return ;
-	for (size_t i = 0; i < _env.size(); i++) {
-		std::cerr << "i : " << i << std::endl;
-		free(_envTab[i]);
-	}
-	free(_envTab);
-	_envTab = NULL;
+	for (size_t i = 0; envTab[i] != NULL; i++)
+		free(envTab[i]);
+	free(envTab);
+	envTab = NULL;
 }
 
 
@@ -580,13 +523,12 @@ void	CgiHandler::_freeTab()
 /*                  PRINT                           */
 /*                                                  */
 /****************************************************/
-void	CgiHandler::printEnv() const
+void	CgiHandler::printEnv(char **envTab) const
 {
-//	std::map<std::string, std::string>	geader = _env;
 //	for (std::map<std::string, std::string>::iterator it = geader.begin(); it != geader.end(); it++)
 //		std::cerr << "Env = " << it->first << " - [" << it->second << "]\n";
-	for (int i = 0; _envTab[i] != NULL; i++)
-		std::cerr << "Env: [" << _envTab[i] << "]\n";
+	for (int i = 0; envTab[i] != NULL; i++)
+		std::cerr << "Env: [" << envTab[i] << "]\n";
 }
 
 void	CgiHandler::printHeader() const

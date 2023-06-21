@@ -58,6 +58,8 @@ private:
 	std::string	_dir_list(DIR *dir, std::string path);
 	std::string _generate_error_page(int errcode) const;
 	short _prepare_page();
+	short _wait_cgi();
+	short _prepare_cgi_page();
 	void _prepare_error(HttpError e);
 };
 
