@@ -4,6 +4,7 @@
 #include <iostream>
 #include "webserv.hpp"
 #include "Conf.hpp"
+#include "Quit.hpp"
 
 #ifndef DFL_CONF
 #define DFL_CONF "conf/server.conf"
@@ -11,6 +12,7 @@
 
 int main(int ac, char **av)
 {
+	signal(SIGINT, sighook_quit);
  	// basic checks
  	std::ifstream conf_stream;
  	if (ac < 2)
@@ -34,6 +36,8 @@ int main(int ac, char **av)
  		// launch server
  		Server serv(servers);
  		serv.launchServer();
+		std::cerr << "normal exit" << std::endl;
+		return 0;
  	} catch (ParsingException const& e) {
  		e.print_error(std::cerr);
  		return 1;

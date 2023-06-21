@@ -15,6 +15,7 @@ SRCS		=	main.cpp \
 				ChunkStreamer.cpp \
 				Writer.cpp \
 				Conf.cpp \
+				Quit.cpp \
 				CgiHandler.cpp
 
 OBJS		=	${addprefix $(OBJDIR), $(SRCS:%.cpp=%.o)}

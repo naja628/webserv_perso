@@ -1,4 +1,5 @@
 #include "Server.hpp"
+#include "Quit.hpp"
 #include <unistd.h>
 #include <string.h>
 #include <sys/types.h>
@@ -72,6 +73,8 @@ void Server::launchServer(void)
 	while (1)
 	{
 		events = poll(_m_fds.data(), _m_fds.size(), 5000);	// poll: check les eventuelles connections
+		if ( Quit::set() )
+			return ;
 		if (events == -1)
 			throw PollErrorException();
 

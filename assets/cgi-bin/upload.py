@@ -9,7 +9,7 @@ if 'file' in form:
     file_item = form['file']
     if file_item.filename:
         filename = os.path.basename(file_item.filename)
-        upload_dir = '../assets/upload'  # Specify the directory where you want to save the uploaded file
+        upload_dir = '../../upload'  # Specify the directory where you want to save the uploaded file
         upload_path = os.path.join(upload_dir, filename)
 
         print("Received file:", filename)
