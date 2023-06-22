@@ -8,7 +8,6 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <dirent.h>
-#include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -26,7 +25,7 @@
 /*                                                  */
 /****************************************************/
 // default
-CgiHandler::CgiHandler() : _stopwatch(0)
+CgiHandler::CgiHandler() : _pid(-1), _stopwatch(0)
 {}
 
 // copy
@@ -43,6 +42,8 @@ CgiHandler::CgiHandler(const CgiHandler &src)
 /****************************************************/
 CgiHandler::~CgiHandler()
 {
+	if (_pid > 0)
+		kill(_pid, SIGTERM);
 	rmFile();
 }
 
@@ -95,14 +96,14 @@ void	CgiHandler::setRoot(std::string root)
 // filestream
 // close le stream avant d'execve
 // (open + trunc) si 1er appel, sinon (open + append) / ou bien rm apres execve et direct recreer un
-bool	CgiHandler::openFile(int method)
+void	CgiHandler::openFile(int method)
 {
 	if (method == 0)
 	{
 // 		std::cerr << "file buf: " << _fileBuf << "\n";
 		_fs_file.open(_fileBuf.data(), std::fstream::out | std::fstream::trunc);
 		if (!_fs_file.is_open())
-			return 1;	// error
+			throw HttpError(500);
 // 		std::cerr << "after open for write\n";
 // 		std::cerr << "good? : " << _fs_file.good() << ", ";
 // 		std::cerr << "fail? : " << _fs_file.fail() << ", ";
@@ -113,10 +114,8 @@ bool	CgiHandler::openFile(int method)
 	{
 		_fs_file.open(_fileBuf.data(), std::fstream::in);
 		if (!_fs_file.is_open())
-			return 1;	// error
+			throw HttpError(500);
 	}
-
-	return 0;
 }
 
 void	CgiHandler::closeFile()
@@ -190,6 +189,15 @@ void	CgiHandler::clearDirectory(std::string dirPath)
 	closedir(dir);
 }
 
+std::string	CgiHandler::fileToStr()
+{
+	std::ifstream		ifs(_fileExec.data());
+	std::stringstream	buf;
+
+	buf << ifs.rdbuf();
+	return (buf.str());
+}
+
 
 
 /****************************************************/
@@ -203,28 +211,39 @@ bool	CgiHandler::waitChild()
 	int	wstatus;
 	if (!waitpid(_pid, &wstatus, WNOHANG))
 	{
+		std::cerr << "clock = " << clock() << '\n';
+		std::cerr << "stop  = " << _stopwatch << '\n';
+		std::cerr << (((float)(clock() - _stopwatch)) / CLOCKS_PER_SEC) << "\n";
+		std::cerr << CLOCKS_PER_SEC << "\n";
+		std::cerr << "pid = " << _pid << '\n';
 		if ((((float)(clock() - _stopwatch)) / CLOCKS_PER_SEC) >= CGI_TIMEOUT)
 		{
-			kill(_pid, SIGKILL);
-			throw HttpError(504);
+			kill(_pid, SIGTERM);
+			_pid = -1;
+			throw HttpError(508);	// loop != timeout
+		}
+		if (WIFEXITED(wstatus) == true)
+		{
+			_pid = -1;
+			throw HttpError(500);
 		}
 		return true;
 	}
-
-std::cerr << "------> wstatus = " << WEXITSTATUS(wstatus) << '\n';
+	_pid = -1;
 	return false;
 }
 
 void	CgiHandler::run()
 {
 std::cerr << "_in_cgi\n";
-	int pid;
 
+	if (_pid > 0)
+		kill(_pid, SIGTERM);
 	_stopwatch = clock();
-	pid = fork();
-	if (pid < 0)
+	_pid = fork();
+	if (_pid < 0)
 		throw HttpError(500);
-	if (!pid)
+	if (!_pid)
 		_launch();
 }
 
@@ -294,15 +313,6 @@ bool	CgiHandler::_checkExtension(std::string path)
 	return false;
 }
 
-std::string	CgiHandler::fileToStr()
-{
-	std::ifstream		ifs(_fileExec.data());
-	std::stringstream	buf;
-
-	buf << ifs.rdbuf();
-	return (buf.str());
-}
-
 void	CgiHandler::_exit(int fd1, int fd2)
 {
 	if (fd1 >= 0)
@@ -320,24 +330,31 @@ void	CgiHandler::_exit(int fd1, int fd2)
 /*                  PRIVATE SETTERS                 */
 /*                                                  */
 /****************************************************/
-bool	CgiHandler::setFilename()	// throw a la place de return
+void	CgiHandler::setFilename()
 {
-	for (int i = 0; i < 100; i++)	// > 100
+	for (int i = 0; i < 2000; i++)
 	{
 		std::ostringstream	ss_filename;
-		ss_filename << "runtime/tmpFile_" << i;
-		if (FILE *file = std::fopen(ss_filename.str().c_str(), "r"))
-			fclose(file);
+		ss_filename << "/tmp/webserv_tmpFile_" << i;
+//		if (FILE *file = std::fopen(ss_filename.str().c_str(), "r"))
+//			fclose(file);
+		if (access(ss_filename.str().c_str(), F_OK) == 0)
+		{
+std::cerr << "File: " << ss_filename.str() << " exists\n";
+			continue ;
+		}
 		else
 		{
+std::cerr << "Create file: " << ss_filename.str() << '\n';
 			_fileBuf.assign(ss_filename.str());
 			_fileExec.assign(_fileBuf + "_exec");	// dans un setters
 			_fs_file.open(_fileBuf.data(), std::fstream::out);	// est-ce qu'on cree file_exec ici
 			_fs_file.close();
-			return 0;
+			return ;
 		}
 	}
-	return 1;
+std::cerr << "Files to 2000 full \n";
+	throw HttpError(500);
 }
 
 char	**CgiHandler::_setEnv(int fd1, int fd2)	// traduire les "./"	// exit a la place de return
@@ -431,14 +448,11 @@ std::string	CgiHandler::_getStrInfo(std::string str, char c, int method)
 	return (str.substr(0, pos));
 }
 
-bool	CgiHandler::_fileExists(std::string path)
+bool	CgiHandler::_fileExists(std::string path)	// access
 {
-	struct stat	fileStat;
-
-	if (stat(path.c_str(), &fileStat) == 0)
-		if (S_ISREG(fileStat.st_mode))
-			return true;
-	return false;
+	if (access(path.c_str(), F_OK) < 0)
+		return false;
+	return true;
 }
 
 std::string	CgiHandler::_getPathInfo()

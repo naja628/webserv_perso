@@ -10,7 +10,7 @@
 # include "HttpParser.hpp"
 # include "Conf.hpp"
 
-# define CGI_TIMEOUT 20
+# define CGI_TIMEOUT 0.3
 
 class CgiHandler
 {
@@ -29,14 +29,14 @@ class CgiHandler
 		CgiHandler	&operator=(const CgiHandler &src);
 
 	// setters
-		bool	setFilename();
+		void	setFilename();
 		void	setRoot(std::string root);
 		void	setParser(HttpParser pa);
 		void	setMethod(std::string method);
 		void	setConf(const ServerConf *pconf);
 
 	// files operators
-		bool		openFile(int method);	// dispatch
+		void		openFile(int method);	// dispatch
 		void		closeFile();
 		void		rmFile();
 		ssize_t		bodyInFile(Buf & buf, size_t rem_chunk_size);
@@ -62,10 +62,9 @@ class CgiHandler
 		std::string							_root;	// pathConf(getter)
 		std::fstream						_fs_file;
 		std::map<std::string, std::string>	_header;
-
 		
-		clock_t	_stopwatch;
 		int		_pid;
+		clock_t	_stopwatch;
 
 		HttpParser							_pa;
 

@@ -21,7 +21,7 @@ class ConState {
 public:
 	// TODO accepting NULL is a bad idea
 	ConState(int fd = -1, VirtualServers const* confs = NULL, int port = 4242);
-	void init_cgi();
+	//void init_cgi();
 	short operator()(short pollflags);
 	short event_set() const;
 

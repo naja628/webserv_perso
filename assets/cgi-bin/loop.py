@@ -1,5 +1,6 @@
 #!/usr/bin/python3
+import sys
 
 while True:
-    pass
+    print("vous etes bo", file=sys.stderr)
 
