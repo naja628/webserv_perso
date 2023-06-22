@@ -66,7 +66,7 @@ class HttpParser { // Class used to parse an http request
 	// TODO maybe handle leading newlines before a request
 
 public:
-	HttpParser();
+	HttpParser(std::string const& newline = "\r\n");
 	// doesn't manage any raw resource so will behave canonically 
 
 	/* GETTERS */
@@ -101,6 +101,7 @@ public:
 	Status parse_some(BufType & buf);
 
 private:
+	std::string 	_nl;
 	Status			_status;
 	std::string		_method;
 	std::string		_uri;

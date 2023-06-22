@@ -100,8 +100,8 @@ static std::string str_tolower(std::string const& s) {
 	return res;
 }
 
-HttpParser::HttpParser() 
-	: _status(START), _method(), _uri(), _header(), _last_key() 
+HttpParser::HttpParser(std::string const& newline) 
+	: _nl(newline), _status(START), _method(), _uri(), _header(), _last_key() 
 {}
 
 // getters
@@ -129,7 +129,7 @@ HttpParser::Status HttpParser::parse_line(BufType& buf) {
 // 		default:
 // 			break;
 	}
-	if ( !passover(buf, "\r\n") )
+	if ( !passover(buf, _nl.data()) )
 		throw HttpError(400);
 	return _status;
 }
