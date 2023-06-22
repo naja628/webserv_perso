@@ -1,5 +1,4 @@
 #include <signal.h>
-
 #include <fstream>
 #include <iostream>
 #include "webserv.hpp"
@@ -28,28 +27,35 @@ int main(int ac, char **av)
  		return 1;
  	}
  
+	VirtualServers servers;
  	try {
  		// parse config
- 		VirtualServers servers(conf_stream);
+		servers.parse_conf(conf_stream);
  		conf_stream.close();
- 
- 		// launch server
- 		Server serv(servers);
- 		serv.launchServer();
-		std::cerr << "normal exit" << std::endl;
-		return 0;
  	} catch (ParsingException const& e) {
  		e.print_error(std::cerr);
  		return 1;
  	}
- // 	} catch ( HttpError e) {
- // 		std::cerr << "Error: " << e << "\n";
- // 		return 1;
- // 	} catch (...) {
- // 		std::cerr << "Error\n"; 
- // 		return 1;
- // 	}
- 
+
+	while (1)
+	{
+		// launch server
+		try {
+			Server serv(servers);
+			serv.launchServer();
+			std::cerr << "normal exit" << std::endl;
+			return 0;
+		}
+		catch (const std::bad_alloc& e)
+		{
+			std::cerr << "in bad alloc\n";
+		}
+		catch (const std::exception& e)
+		{
+			std::cerr << "Fatal error: " << e.what() << std::endl;
+			return 1;
+		}
+	}
 
 	return 0;
 }

@@ -42,9 +42,9 @@ ConState::ConState(int fd, VirtualServers const* confs, int port)
 	std::cerr << "ctor breakpoint\n";
 }
 
-void ConState::init_cgi() {
-	_cgi.setFilename();
-}
+// void ConState::init_cgi() {
+// 	_cgi.setFilename();
+// }
 
 short ConState::_get_new_request() {
 	_pa = HttpParser();
@@ -68,7 +68,7 @@ short ConState::_get_first_request() {
 			return 0;
 
 		_pconf->print(); // DEBUG
-
+		_cgi.setFilename();
 		if ( _pa.status() == HttpParser::PREBODY )
 			return _dispatch();
 		else 
@@ -260,15 +260,9 @@ short ConState::_prepare_page() {
 	_cgi.setRoot(locpath);	// dans isCgi()
 	if (_cgi.isCgi() == true)
 	{
-		std::string	tmp_str = _cgi.run();	// un POST renvoie uniquement le status code
-std::cerr << "RESPONSE:\n" << tmp_str << '\n';
-		_wr.set_status(200);
-		if (_cgi.getMethod() == "GET") {
-			_wr.add_header_field("content-type", "text/html");
-			_wr.use_as_body(tmp_str);
-		}
-		_call_next = &ConState::_write;
-		return POLLOUT;
+		_cgi.run();
+		_call_next = &ConState::_wait_cgi;
+		return (_wait_cgi());
 	}
 
 	// response common part:
@@ -311,6 +305,26 @@ std::cerr << "RESPONSE:\n" << tmp_str << '\n';
 		_wr.read_body_from_file(pagefd);
 		close(pagefd);
 	}
+	_call_next = &ConState::_write;
+	return POLLOUT;
+}
+
+short ConState::_wait_cgi() {
+std::cerr << "wait for child\n";
+	if (_cgi.waitChild() == true)
+		return POLLOUT;
+	else
+		return _prepare_cgi_page();
+}
+
+short ConState::_prepare_cgi_page()
+{
+// std::map cgi_header = _cgi.parseHeader()
+
+	std::string	tmp_str = _cgi.fileToStr();
+	_wr.set_status(200);
+	_wr.add_header_field("content-type", "text/html");
+	_wr.use_as_body(tmp_str);
 	_call_next = &ConState::_write;
 	return POLLOUT;
 }

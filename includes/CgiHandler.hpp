@@ -4,10 +4,13 @@
 # include <vector>
 # include <map>
 # include <fstream>
+# include <ctime>
 
 # include "Buf.hpp"
 # include "HttpParser.hpp"
 # include "Conf.hpp"
+
+# define CGI_TIMEOUT 0.3
 
 class CgiHandler
 {
@@ -25,30 +28,29 @@ class CgiHandler
 	// assign operator
 		CgiHandler	&operator=(const CgiHandler &src);
 
-	// getters
-		std::string	getMethod() const;
-
 	// setters
-		bool	setFilename();
+		void	setFilename();
 		void	setRoot(std::string root);
 		void	setParser(HttpParser pa);
 		void	setMethod(std::string method);
 		void	setConf(const ServerConf *pconf);
 
 	// files operators
-		bool	openFile(int method);	// dispatch
-		void	closeFile();
-		void	rmFile();
-		ssize_t	bodyInFile(Buf & buf, size_t rem_chunk_size);
-		void	clearDirectory(std::string dirPath);
+		void		openFile(int method);	// dispatch
+		void		closeFile();
+		void		rmFile();
+		ssize_t		bodyInFile(Buf & buf, size_t rem_chunk_size);
+		void		clearDirectory(std::string dirPath);
+		std::string	fileToStr();
 
 	// launch
-		bool		isCgi();
-		std::string	run();
+		bool	isCgi();
+		void	run();
+		bool	waitChild();
 
 	// print		// debug only
 		void	printHeader() const;
-		void	printEnv() const;
+		void	printEnv(char **envTab) const;
 
 
 	private:
@@ -60,8 +62,9 @@ class CgiHandler
 		std::string							_root;	// pathConf(getter)
 		std::fstream						_fs_file;
 		std::map<std::string, std::string>	_header;
-		std::map<std::string, std::string>	_env;
-		char								**_envTab;	// = NULL
+		
+		int		_pid;
+		clock_t	_stopwatch;
 
 		HttpParser							_pa;
 
@@ -69,10 +72,9 @@ class CgiHandler
 		void		_launch();
 		bool		_checkExtension(std::string path);
 		void		_exit(int fd1, int fd2);
-		std::string	_fileToStr();
 
 	// setters
-		void		_setEnv(int fd1, int fd2);
+		char		**_setEnv(int fd1, int fd2);
 		
 	// env utils
 		std::string	_fileSize();
@@ -82,7 +84,7 @@ class CgiHandler
 		bool		_fileExists(std::string path);
 		std::string	_getPathInfo();
 		std::string	_getPath(int method);
-		void		_freeTab();
+		void		_freeTab(char **envTab);
 
 };
 

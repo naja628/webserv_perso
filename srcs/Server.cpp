@@ -15,7 +15,10 @@ Server::Server(VirtualServers const& conf)
 
 //Server::Server(const Server& other) {}
 Server::~Server() {
-	std::cerr << "server dtor" << std::endl;
+	std::cerr << "server dtor\n";
+	for (size_t i = 0; i < _m_fds.size(); ++i) {
+		close( _m_fds[i].fd );
+	}
 }
 
 Server Server::operator= (const Server& other)
@@ -89,7 +92,7 @@ void Server::launchServer(void)
 				std::cout << "new connection on fd: " << cli_sock << std::endl;
 				_m_addFd(cli_sock);	// rajoute la nouvelle socket
 				_m_con_map[cli_sock] = ConState(cli_sock, &_m_conf, _m_ports[current]); // cree constate qui check l'etat de la socket/connection
-				_m_con_map[cli_sock].init_cgi();
+//				_m_con_map[cli_sock].init_cgi();
 			}
 		}
 

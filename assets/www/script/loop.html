@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Execute Loop Script</title>
+    <script>
+        function executeScript() {
+            var form = document.createElement("form");
+            form.method = "POST";
+            form.action = "/cgi-bin/loop.py";
+
+            document.body.appendChild(form);
+            form.submit();
+        }
+    </script>
+</head>
+<body>
+    <h1>Execute Loop Script</h1>
+    <button onclick="executeScript()">Execute</button>
+</body>
+</html>
+

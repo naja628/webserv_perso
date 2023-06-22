@@ -21,7 +21,7 @@ class ConState {
 public:
 	// TODO accepting NULL is a bad idea
 	ConState(int fd = -1, VirtualServers const* confs = NULL, int port = 4242);
-	void init_cgi();
+	//void init_cgi();
 	short operator()(short pollflags);
 	short event_set() const;
 
@@ -58,6 +58,8 @@ private:
 	std::string	_dir_list(DIR *dir, std::string path);
 	std::string _generate_error_page(int errcode) const;
 	short _prepare_page();
+	short _wait_cgi();
+	short _prepare_cgi_page();
 	void _prepare_error(HttpError e);
 };
 
