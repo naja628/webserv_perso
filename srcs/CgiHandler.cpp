@@ -86,6 +86,11 @@ void	CgiHandler::setRoot(std::string root)
 	_root = root;
 }
 
+void	CgiHandler::setExtensions(std::set<std::string> ext)
+{
+	_ext = ext;
+}
+
 
 
 /****************************************************/
@@ -211,23 +216,23 @@ bool	CgiHandler::waitChild()
 	int	wstatus;
 	if (!waitpid(_pid, &wstatus, WNOHANG))
 	{
-		std::cerr << "clock = " << clock() << '\n';
-		std::cerr << "stop  = " << _stopwatch << '\n';
-		std::cerr << (((float)(clock() - _stopwatch)) / CLOCKS_PER_SEC) << "\n";
-		std::cerr << CLOCKS_PER_SEC << "\n";
-		std::cerr << "pid = " << _pid << '\n';
+//		std::cerr << "clock = " << clock() << '\n';
+//		std::cerr << "stop  = " << _stopwatch << '\n';
+//		std::cerr << (((float)(clock() - _stopwatch)) / CLOCKS_PER_SEC) << "\n";
+//		std::cerr << CLOCKS_PER_SEC << "\n";
+//		std::cerr << "pid = " << _pid << '\n';
 		if ((((float)(clock() - _stopwatch)) / CLOCKS_PER_SEC) >= CGI_TIMEOUT)
 		{
 			kill(_pid, SIGTERM);
 			_pid = -1;
 			throw HttpError(508);	// loop != timeout
 		}
-		if (WIFEXITED(wstatus) == true)
-		{
-			_pid = -1;
-			throw HttpError(500);
-		}
 		return true;
+	}
+	if (WIFEXITED(wstatus) == false)
+	{
+		_pid = -1;
+		throw HttpError(500);
 	}
 	_pid = -1;
 	return false;
@@ -236,6 +241,7 @@ bool	CgiHandler::waitChild()
 void	CgiHandler::run()
 {
 std::cerr << "_in_cgi\n";
+// std::cerr << "extensions = " << *_ext.begin() << '\n';	// abort if empty
 
 	if (_pid > 0)
 		kill(_pid, SIGTERM);
@@ -249,7 +255,7 @@ std::cerr << "_in_cgi\n";
 
 bool	CgiHandler::isCgi()
 {
-	std::string	path = _getPath(0);
+	std::string	path = _getPath();
 std::cerr << "isCgi -> path = " << path << '\n';
 	if (path == "")
 		return false;
@@ -268,7 +274,7 @@ void	CgiHandler::_launch()
 {
 	int	fd1, fd2;
 
-	std::string	path = _getPath(0);
+	std::string	path = _getPath();
 // 	if (access(path.c_str(), F_OK) == -1)	// avant	// necessaire? comme on verifie dans isCgi()
 	if (access(path.c_str(), X_OK) == -1)	// avant	// necessaire? comme on verifie dans isCgi()
 		_exit(-1, -1);
@@ -283,13 +289,25 @@ void	CgiHandler::_launch()
 	if (dup2(fd2, STDOUT_FILENO) < 0)
 		_exit(fd1, fd2);
 
-	if (chdir(path.substr(0, path.find_last_of('/')).c_str()) < 0)	// check if good path
+	std::string	pathDir = path.substr(0, path.find_last_of('/'));
+	if (chdir(pathDir.c_str()) < 0)	// check if good path
 	{
 std::cerr << "Couldn't change directory\n";
 		_exit(fd1, fd2);
 	}
 
+	if (_root[pathDir.size()] == '/')
+		_root.erase(0, pathDir.size() + 1);
+	else
+		_root.erase(0, pathDir.size());
+
+std::cerr << "xxxxxxxxxxxxxxxxxxxxxxx/n";
+std::cerr << "newRoot = {" << _root << "}\n";
+std::cerr << "path() = {" << _getPath() << "}\n";
+std::cerr << "path_info() = {" << _getPathInfo() << "}\n";
+std::cerr << "xxxxxxxxxxxxxxxxxxxxxxx/n";
 	char	**envTab = _setEnv(fd1, fd2);	// close les fd
+printEnv(envTab);
 
 	char *tab[2];
 	tab[0] = (char *)path.substr(path.find_last_of('/') + 1).c_str();
@@ -377,8 +395,9 @@ char	**CgiHandler::_setEnv(int fd1, int fd2)	// traduire les "./"	// exit a la p
 	env["REMOTE_HOST"] = _getFromHeader("host");	// localhost:port
 
 	env["REQUEST_METHOD"] = _method;
-	env["SCRIPT_NAME"] = _getPath(1);	// /cgi-bin/process.php	// problem while print (".")
-	env["SCRIPT_FILENAME"] = _getPath(0);	// _root + getPath();	// root + script_name
+std::cerr << "uuuuuuuuuuuuuuuuuuuuuuuuuuuuuu\n";
+	env["SCRIPT_NAME"] = _getPath();	// /cgi-bin/process.php	// problem while print (".")
+	env["SCRIPT_FILENAME"] = "";	// how to know without getcwd() ?
 	env["SERVER_NAME"] = _getStrInfo(_getFromHeader("host"), ':', 0);
 	env["SERVER_PORT"] = _getStrInfo(_getFromHeader("host"), ':', 1);
 	env["SERVER_PROTOCOL"] = "HTTP/1.1";
@@ -448,8 +467,21 @@ std::string	CgiHandler::_getStrInfo(std::string str, char c, int method)
 	return (str.substr(0, pos));
 }
 
+static bool	isDir(std::string path)
+{
+	DIR	*dir = opendir(path.c_str());
+	if (dir)
+	{
+		closedir(dir);
+		return true;
+	}
+	return false;
+}
+
 bool	CgiHandler::_fileExists(std::string path)	// access
 {
+	if (isDir(path) == true)
+		return false;
 	if (access(path.c_str(), F_OK) < 0)
 		return false;
 	return true;
@@ -458,40 +490,23 @@ bool	CgiHandler::_fileExists(std::string path)	// access
 std::string	CgiHandler::_getPathInfo()
 {
 	std::string	path(_root);	// hardcode path
-	path += _pa.uri();
+//	path += _pa.uri();
 
 	if (path.find('?') != std::string::npos)
 		path.erase(path.find_first_of('?'), std::string::npos);
-	if (path.find(';') != std::string::npos)
+	if (path.find(';') != std::string::npos)	// a verifier
 		path.erase(path.find_first_of(';'), std::string::npos);
 
-	size_t	i = 0;
-	size_t	j;
-
-	while (i != std::string::npos)
-	{
-		i = path.find_first_of('/', i);
-		if (i == std::string::npos)
-			return "";
-
-		j = path.find_first_of('/', i + 1);
-		if (j != std::string::npos)
-		{
-			if (_fileExists(path.substr(0, j)) == true)
-				return (path.substr(j, path.size() - j));
-		}
-		i++;
-	}
-	return "";
+	return (path.substr(_getPath().size()));
 }
 
-std::string	CgiHandler::_getPath(int method)
+std::string	CgiHandler::_getPath()
 {
 	std::string	path(_root);	// hardcode path
 
 	if (path.find('?') != std::string::npos)
 		path.erase(path.find_first_of('?'), std::string::npos);
-	if (path.find(';') != std::string::npos)
+	if (path.find(';') != std::string::npos)	// a verifier
 		path.erase(path.find_first_of(';'), std::string::npos);
 
 	if (_fileExists(path) == true)
@@ -501,7 +516,8 @@ std::string	CgiHandler::_getPath(int method)
 	size_t j = 0;
 	while (i != std::string::npos)
 	{
-		i = path.find_first_of('/', i);
+		if (j == 0 && (path[0] == '/'))
+			i = path.find_first_of('/', i);
 		if (i == std::string::npos)
 			return "";
 
@@ -509,12 +525,7 @@ std::string	CgiHandler::_getPath(int method)
 		if (j == std::string::npos)
 			return "";
 		else if (_fileExists(path.substr(0, j)) == true)
-		{
-			if (method == 0)
-				return (path.substr(0, j));
-			else
-				return (path.substr(_root.size(), j));
-		}
+			return (path.substr(0, j));
 		i++;
 	}
 	return "";

@@ -256,8 +256,10 @@ short ConState::_prepare_page() {
 	}
 	std::cerr << "transalted path: " << locpath << "\n"; // DEBUG
 
+
 	_cgi.setParser(_pa);	// dans isCgi()
 	_cgi.setRoot(locpath);	// dans isCgi()
+	_cgi.setExtensions(path_conf->cgi_extensions());
 	if (_cgi.isCgi() == true)
 	{
 		_cgi.run();
