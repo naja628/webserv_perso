@@ -32,13 +32,10 @@ private:
 	int _port;
 	short _event_set;
 
-	VirtualServers const* _confs; // TODO this is ugly
+	VirtualServers const* _confs;
 	ServerConf const* _pconf;
-	// maybe :
-	// output_buffer
-	// fds?
 
-	HttpParser _pa; // probably change this
+	HttpParser _pa;
 	Buf _in_buf;
 	ChunkStreamer _chunk_streamer;
 	Writer _wr;

@@ -2,8 +2,13 @@
 
 import cgi
 import os
+import sys
 
 form = cgi.FieldStorage()
+print("Content-type: text/plain")
+print("Status: 201")
+print("My-Super-Header: whatever")
+print("")
 
 if 'file' in form:
     file_item = form['file']
@@ -20,6 +25,7 @@ if 'file' in form:
             file.write(file_item.file.read())
 
         print("File uploaded successfully.")
+        exit(0)
     else:
         print("Error: No file selected.")
 else:

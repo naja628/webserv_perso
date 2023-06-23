@@ -222,12 +222,13 @@ bool	CgiHandler::waitChild()
 			_pid = -1;
 			throw HttpError(508);	// loop != timeout
 		}
-		if (WIFEXITED(wstatus) == true)
-		{
-			_pid = -1;
-			throw HttpError(500);
-		}
 		return true;
+	}
+	if (WIFEXITED(wstatus) == false)
+	{
+		_pid = -1;
+		std::cerr << "cgi failed\n";
+		throw HttpError(500);
 	}
 	_pid = -1;
 	return false;

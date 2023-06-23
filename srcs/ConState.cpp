@@ -10,6 +10,7 @@
 #include <sys/time.h>
 #include <fstream>
 #include <cstdio>
+#include <iostream>
 
 // Internal
 // #include "HttpResponse.hpp"
@@ -317,13 +318,63 @@ std::cerr << "wait for child\n";
 		return _prepare_cgi_page();
 }
 
+static std::string trim(std::string const& s) {
+	std::string::size_type i, j;
+	i = s.find_first_not_of("\t ");
+	j = s.find_last_not_of("\t ");
+	return (i == std::string::npos ? s : s.substr(i, j));
+}
+	
+static std::string str_tolower(std::string const& s) {
+	typedef std::string::size_type Sz;
+
+	std::string res;
+	res.reserve(s.size());
+
+	for (Sz i = 0; i < s.size(); ++i)
+		res.push_back( tolower(s[i]) );
+	return res;
+}
+
 short ConState::_prepare_cgi_page()
 {
 // std::map cgi_header = _cgi.parseHeader()
 
+	std::cerr << "_cgi_prep\n";
 	std::string	tmp_str = _cgi.fileToStr();
-	_wr.set_status(200);
-	_wr.add_header_field("content-type", "text/html");
+	std::map<std::string, std::string> response_header;
+	std::istringstream iss(tmp_str);
+	while (true) {
+		std::string line;
+		std::getline(iss, line, '\n');
+		if (iss.fail())
+			throw HttpError(500);
+		if (line == "")
+			break;
+		std::string::size_type icolon = line.find(':');
+		if (icolon == std::string::npos)
+			throw HttpError(500);
+		response_header[str_tolower(line.substr(0, icolon))] 
+			= trim(line.substr(icolon + 1));
+	}
+
+	std::cerr << "parsed response header\n";
+	_wr.reset();
+	if (response_header.count("status")) {
+		_wr.set_status(from_str<int>(response_header.at("status"), HttpError(500)));
+		response_header.erase("status");
+	} else {
+		_wr.set_status(200);
+	}
+
+	typedef std::map<std::string, std::string>::iterator It;
+	for (It it = response_header.begin(); it != response_header.end(); ++it)
+		_wr.add_header_field(it->first, it->second);
+
+	if (!response_header.count("content-type"))
+		_wr.add_header_field("content-type", "text/html");
+
+	tmp_str = tmp_str.substr(iss.tellg());
 	_wr.use_as_body(tmp_str);
 	_call_next = &ConState::_write;
 	return POLLOUT;

@@ -23,8 +23,14 @@ try:
 except ValueError:
     result = None
 
+# Header 
+html_response = '''content-type: text/html
+status: 200
+
+'''
+
 # Generate the HTML response
-html_response = '''
+html_response += '''
 <!DOCTYPE html>
 <html>
 <head>
