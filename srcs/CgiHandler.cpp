@@ -301,11 +301,6 @@ std::cerr << "Couldn't change directory\n";
 	else
 		_root.erase(0, pathDir.size());
 
-std::cerr << "xxxxxxxxxxxxxxxxxxxxxxx/n";
-std::cerr << "newRoot = {" << _root << "}\n";
-std::cerr << "path() = {" << _getPath() << "}\n";
-std::cerr << "path_info() = {" << _getPathInfo() << "}\n";
-std::cerr << "xxxxxxxxxxxxxxxxxxxxxxx/n";
 	char	**envTab = _setEnv(fd1, fd2);	// close les fd
 printEnv(envTab);
 
@@ -395,7 +390,6 @@ char	**CgiHandler::_setEnv(int fd1, int fd2)	// traduire les "./"	// exit a la p
 	env["REMOTE_HOST"] = _getFromHeader("host");	// localhost:port
 
 	env["REQUEST_METHOD"] = _method;
-std::cerr << "uuuuuuuuuuuuuuuuuuuuuuuuuuuuuu\n";
 	env["SCRIPT_NAME"] = _getPath();	// /cgi-bin/process.php	// problem while print (".")
 	env["SCRIPT_FILENAME"] = "";	// how to know without getcwd() ?
 	env["SERVER_NAME"] = _getStrInfo(_getFromHeader("host"), ':', 0);
