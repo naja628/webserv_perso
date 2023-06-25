@@ -1,3 +1,5 @@
+#include <fstream>
+
 // C libs
 #include <unistd.h>
 #include <sys/types.h>
@@ -8,16 +10,13 @@
 #include <dirent.h>
 #include <iomanip>
 #include <sys/time.h>
-#include <fstream>
 #include <cstdio>
-#include <iostream>
 
 // Internal
-// #include "HttpResponse.hpp"
 #include "Writer.hpp"
 #include "HttpParser.hpp"
 #include "HttpError.hpp"
-#include "nat_utils.hpp" // strof
+#include "nat_utils.hpp" 
 #include "ConState.hpp"
 #include "Buf.hpp"
 #include "CgiHandler.hpp"
@@ -51,10 +50,6 @@ void ConState::init(int fd, VirtualServers const* confs, int port) {
 	_pconf = NULL;
 	_call_next = &ConState::_get_first_request;
 }
-
-// void ConState::init_cgi() {
-// 	_cgi.setFilename();
-// }
 
 short ConState::_get_new_request() {
 	_pa = HttpParser();
@@ -126,13 +121,16 @@ short ConState::_dispatch() {
 	if ( _pa.method() == "POST" )
 	{
 		_chunk_streamer = ChunkStreamer(); // reset
-// 		_chunk_streamer.setfd(1);
-// 
+
 		_cgi.setMethod("POST");
 		_cgi.openFile(0);
 
-// 		_chunk_streamer.setfd(2); // DEBUG
-		return _read_body();
+		try {
+			return _read_body();
+		} catch (HttpError & e) {
+			_cgi.closeFile();
+			throw ;
+		}
 	}
 
 	if ( _pa.method() == "GET" )
@@ -164,8 +162,6 @@ short ConState::_dispatch() {
 short ConState::_read_body()
 {
 	_call_next = &ConState::_read_body;
-// 	if (_chunk_streamer.status() == ChunkStreamer::DONE)
-// 		_chunk_streamer = ChunkStreamer(); // reset
 	if (   _pa.header().count("transfer-encoding")
 		&& _pa.header().at("transfer-encoding") == "chunked" )
 	{
@@ -195,7 +191,7 @@ short ConState::_read_body()
 			std::cerr << "body done\n";
 	}
 
-	_cgi.closeFile(); // TODO throw safety
+	_cgi.closeFile();
 		
 	return _prepare_page();
 }
@@ -233,18 +229,8 @@ std::string	ConState::_dir_list(DIR *dir, std::string path)
 		if (name.size() > 51)
 			ss_buf << " ";
 
-// 		struct stat	fileStat;
-// 		if (stat((path + "/" + name).c_str(), &fileStat) == -1)
 		if (access((path + "/" + name).data(), R_OK) == -1)
 			continue ;	// skip bc no access
-// 		time_t	modTime = fileStat.st_mtime;
-// 		char	modTimeStr[20];
-// 		strftime(modTimeStr, sizeof(modTimeStr), "%d-%B-%Y %H:%M", localtime(&modTime));
-// 		ss_buf << std::setw(68 - name.size()) << modTimeStr;
-// 
-// 		S_ISREG(fileStat.st_mode);
-// 		ss_buf << std::setw(20) << strof(fileStat.st_size);
-
 		ss_buf << "\n";
 	}
 	ss_buf << "</pre><hr></body>\n</html>";
@@ -279,7 +265,7 @@ short ConState::_prepare_page() {
 	_cgi.setParser(_pa);	// dans isCgi()
 	_cgi.setRoot(locpath);	// dans isCgi()
 	_cgi.setExtensions(path_conf->cgi_extensions());
-	if (_cgi.isCgi() == true)
+	if (_cgi.isCgi(path_conf->cgi_extensions()) == true)
 	{
 		_cgi.run();
 		_call_next = &ConState::_wait_cgi;
@@ -305,7 +291,6 @@ short ConState::_prepare_page() {
 					"content-type",
 				   	get_mime_type(index_path, _confs->mime_map() ));
 			_choose_write_method();
-// 			_wr.read_body_from_file(fd);
 		// try directory listing
 		} else if ( path_conf->directory_listing()) {
 			_wr.add_header_field("content-type", "text/html");
@@ -356,8 +341,6 @@ static std::string str_tolower(std::string const& s) {
 
 short ConState::_prepare_cgi_page()
 {
-// std::map cgi_header = _cgi.parseHeader()
-
 	std::cerr << "_cgi_prep\n";
 	std::string	tmp_str = _cgi.fileToStr(); // TODO use fstream
 	std::map<std::string, std::string> response_header;
@@ -472,9 +455,6 @@ void ConState::_prepare_error(HttpError e) {
 
 short ConState::operator() (short pollflags)
 {
-// 	if (_fd > 5) { // DEBUG
-// 		std::cerr << "hello\n"; // gdb breakpoint
-// 	}
 	int recvd;
 	if (pollflags & POLLIN) 
 	{
@@ -489,7 +469,7 @@ short ConState::operator() (short pollflags)
 			return (_event_set = 0); // will close connection
 		}
 	}
-	if (! (pollflags & _event_set) ) // con closed by client (probably)
+	if (! (pollflags & _event_set) ) // not what we need now
 		return _event_set;
 
 	try {

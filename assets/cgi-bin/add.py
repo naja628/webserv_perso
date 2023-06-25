@@ -25,7 +25,7 @@ except ValueError:
 
 # Header 
 html_response = '''content-type: text/html
-status: 200
+status: 200 OK
 
 '''
 

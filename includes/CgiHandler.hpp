@@ -42,9 +42,10 @@ class CgiHandler
 		ssize_t		bodyInFile(Buf & buf, size_t rem_chunk_size);
 		void		clearDirectory(std::string dirPath);
 		std::string	fileToStr();
+		std::string const& outFileName() const;
 
 	// launch
-		bool	isCgi();
+		bool	isCgi(std::set<std::string> allowed_extensions);
 		void	run();
 		bool	waitChild();
 
@@ -71,7 +72,7 @@ class CgiHandler
 
 	// launch utils
 		void		_launch();
-		bool		_checkExtension(std::string path);
+		bool		_checkExtension(std::string path, std::set<std::string> ext);
 		void		_exit(int fd1, int fd2);
 
 	// setters

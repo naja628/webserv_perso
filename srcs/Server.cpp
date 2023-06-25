@@ -60,14 +60,10 @@ void Server::_m_setListen(const int port)
 
 void Server::launchServer(void)
 {
-	// TODO do we want this in ctor
-	// do we want _
 	typedef std::set<int>::const_iterator It;
 	for (It it = _m_conf.ports().begin(); it != _m_conf.ports().end(); ++it)
 		_m_setListen(*it);
 	_m_ports.assign(_m_conf.ports().begin(), _m_conf.ports().end());
-
-// 	_m_setListen(4242);	// set the socket for the port
 
 	int events, cli_sock;
 	struct sockaddr_in cli_addr;

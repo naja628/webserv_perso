@@ -203,7 +203,9 @@ std::string	CgiHandler::fileToStr()
 	return (buf.str());
 }
 
-
+std::string const& CgiHandler::outFileName() const {
+	return _fileExec;
+}
 
 /****************************************************/
 /*                                                  */
@@ -254,16 +256,15 @@ std::cerr << "_in_cgi\n";
 		_launch();
 }
 
-bool	CgiHandler::isCgi()
+bool	CgiHandler::isCgi(std::set<std::string> ext)
 {
 	std::string	path = _getPath();
 std::cerr << "isCgi -> path = " << path << '\n';
 	if (path == "")
 		return false;
 
-	return (_checkExtension(path));
+	return (_checkExtension(path, ext));
 }
-
 
 
 /****************************************************/
@@ -317,14 +318,16 @@ std::cerr << "-> couldn't execute\n\n";
 	_exit(fd1, fd2);
 }
 
-bool	CgiHandler::_checkExtension(std::string path)
+bool	CgiHandler::_checkExtension(std::string path, std::set<std::string> ext)
 {
-	size_t	i = path.find_last_of('.');
-
-	if (i != std::string::npos && (path.substr(i) == ".py" || path.substr(i) == ".php"))
+	if (ext.count("ALL"))
 		return true;
 
-	return false;
+	size_t	i = path.rfind('.');
+	if (i == std::string::npos)
+		return false;
+	else 
+		return ext.count(path.substr(i));
 }
 
 void	CgiHandler::_exit(int fd1, int fd2)
