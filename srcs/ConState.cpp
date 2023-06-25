@@ -40,7 +40,16 @@ ConState::ConState(int fd, VirtualServers const* confs, int port)
 	: _fd(fd), _port(port), _event_set(POLLIN), _confs(confs),
       _cgi(), _call_next(&ConState::_get_first_request)
 {
-	std::cerr << "ctor breakpoint\n";
+	std::cerr << "Constate ctor\n";
+}
+
+void ConState::init(int fd, VirtualServers const* confs, int port) {
+	_fd = fd;
+	_port = port;
+	_event_set = POLLIN;
+	_confs = confs;
+	_pconf = NULL;
+	_call_next = &ConState::_get_first_request;
 }
 
 // void ConState::init_cgi() {
@@ -245,6 +254,15 @@ std::string	ConState::_dir_list(DIR *dir, std::string path)
 	return (str_buf);
 }
 
+void ConState::_choose_write_method() {
+	if (rem_stream_size(_resp_file.get()) < STREAM_THRESHOLD) {
+		_wr.read_body_from_stream(_resp_file.get());
+		_resp_file.get().close();
+	} else {
+		_wr.stream_file_to_body(_resp_file.get());
+	}
+}
+
 short ConState::_prepare_page() {
 	std::cerr << "_prepare_page\n";
 
@@ -271,21 +289,21 @@ short ConState::_prepare_page() {
 
 	DIR * dir;
 	if ( (dir = opendir(locpath.data())) ) { // if directory
-		int fd;
+// 		int fd;
 		// try to use 'index'
 		std::string index_path = path_conf->index();
 		std::cerr << "**index path**: " <<  index_path << "\n";
-		if (index_path != "" 
-			&& (fd = open(_pconf->translate_path(index_path).data(), O_RDONLY)) != -1 )
+		if (index_path != "")
+			_resp_file.get().open(_pconf->translate_path(index_path).data());
+		if (_resp_file.get().is_open())
 	   	{
 			closedir(dir); // won't be needed
 
 			_wr.add_header_field(
 					"content-type",
 				   	get_mime_type(index_path, _confs->mime_map() ));
-			_wr.read_body_from_file(fd);
-// 			_wr.read_body_from_file(pagefd, 4096);
-			close(fd);
+			_choose_write_method();
+// 			_wr.read_body_from_file(fd);
 		// try directory listing
 		} else if ( path_conf->directory_listing()) {
 			_wr.add_header_field("content-type", "text/html");
@@ -297,14 +315,12 @@ short ConState::_prepare_page() {
 			throw HttpError(404);
 		}
 	} else { // serve normal page
-		int pagefd = open(locpath.data(), O_RDONLY);
-		_wr.add_header_field("content-type", get_mime_type(locpath, _confs->mime_map() ) );
-		if (pagefd == -1) {
-			close(pagefd);
+		_resp_file.get().open(locpath.data());
+		if (!_resp_file.get().is_open()) {
 			throw HttpError(404);
 		}
-		_wr.read_body_from_file(pagefd);
-		close(pagefd);
+		_wr.add_header_field("content-type", get_mime_type(locpath, _confs->mime_map() ) );
+		_choose_write_method();
 	}
 	_call_next = &ConState::_write;
 	return POLLOUT;
@@ -341,7 +357,7 @@ short ConState::_prepare_cgi_page()
 // std::map cgi_header = _cgi.parseHeader()
 
 	std::cerr << "_cgi_prep\n";
-	std::string	tmp_str = _cgi.fileToStr();
+	std::string	tmp_str = _cgi.fileToStr(); // TODO use fstream
 	std::map<std::string, std::string> response_header;
 	std::istringstream iss(tmp_str);
 	while (true) {
@@ -374,8 +390,9 @@ short ConState::_prepare_cgi_page()
 	if (!response_header.count("content-type"))
 		_wr.add_header_field("content-type", "text/html");
 
-	tmp_str = tmp_str.substr(iss.tellg());
-	_wr.use_as_body(tmp_str);
+// 	tmp_str = tmp_str.substr(iss.tellg());
+// 	_wr.use_as_body(tmp_str);
+	_wr.read_body_from_stream(iss); // TODO streaming
 	_call_next = &ConState::_write;
 	return POLLOUT;
 }
@@ -386,24 +403,26 @@ short ConState::_write() {
 		default:
 		case Writer::WRITE_ERROR:
 			return 0; // close connection
+		case Writer::READ_ERROR:
+			throw HttpError(500);
 		case Writer::PARTIAL_WRITE:
 			return POLLOUT;
 		case Writer::OK_FINISHED:
+			_resp_file.get().close();
 			_call_next = &ConState::_get_new_request;
 			return POLLIN;
 	}
 }
 
 short ConState::_write_then_close() {
-	// do we care about DRY?
 	switch (_wr.write_some(_fd)) {
 		default:
 		case Writer::WRITE_ERROR:
-			// throw HttpError(500); // http error
 			return 0; // close connection
 		case Writer::PARTIAL_WRITE:
 			return POLLOUT;
 		case Writer::OK_FINISHED:
+			_resp_file.get().close();
 			return 0;
 	}
 }
@@ -440,11 +459,10 @@ void ConState::_prepare_error(HttpError e) {
 	if ( (error_path = _pconf->error_page(e)) ) {
 		std::cerr << "found error page" << std::endl;
 		std::string translated_path = _pconf->translate_path(*error_path);
-		int fd = open(translated_path.data(), O_RDONLY);
-		if (fd >= 0) {
-			_wr.read_body_from_file(fd);
-			close(fd);
-		}
+		_resp_file.get().open(translated_path.data());
+		if (!_resp_file.get().is_open())
+			_wr.body_append(_generate_error_page(e));
+		_choose_write_method();
 	} else {
 		_wr.body_append(_generate_error_page(e));
 	}
@@ -464,7 +482,6 @@ short ConState::operator() (short pollflags)
 		// cf bookmarked stack-overflow for maybe solution
 		recvd = _in_buf.read_more(_fd);
 
-		// TODO this shouldn't block
 		if (recvd <= 0)
 		{
 			return (_event_set = 0); // will close connection
@@ -478,7 +495,6 @@ short ConState::operator() (short pollflags)
 	} catch (HttpError e) {
 		std::cerr << "Caught http error: " << e << std::endl;
 		_prepare_error(e);
-		// TODO extra checks below?
 		if (_chunk_streamer.status() == ChunkStreamer::DONE)
 			_call_next = &ConState::_write;
 		else 

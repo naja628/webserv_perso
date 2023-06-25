@@ -91,7 +91,8 @@ void Server::launchServer(void)
 
 				std::cout << "new connection on fd: " << cli_sock << std::endl;
 				_m_addFd(cli_sock);	// rajoute la nouvelle socket
-				_m_con_map[cli_sock] = ConState(cli_sock, &_m_conf, _m_ports[current]); // cree constate qui check l'etat de la socket/connection
+// 				_m_con_map[cli_sock] = ConState(cli_sock, &_m_conf, _m_ports[current]); // cree constate qui check l'etat de la socket/connection
+				_m_con_map[cli_sock].init(cli_sock, &_m_conf, _m_ports[current]);
 //				_m_con_map[cli_sock].init_cgi();
 			}
 		}

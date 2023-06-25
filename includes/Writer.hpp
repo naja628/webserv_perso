@@ -1,22 +1,24 @@
 #ifndef WRITE_HPP
 # define WRITE_HPP
 
-#include <string>
-#include <map>
+# include <string>
+# include <map>
+# include <fstream>
+# include <iostream>
+# include <cstddef>
+# include "Buf.hpp"
 
 typedef std::map<std::string const, std::string const> MimeMap;
 std::string get_mime_type(const std::string& file_path, MimeMap const& mimes);
 
+size_t rem_stream_size(std::istream & in);
+
 class Writer {
 public:
-//  TODO for chunks
-// 	static const int 
-// 		START = 0, SEND_HEADER = 1, SEND_BODY = 2, SEND_CHUNK = 3, DONE = 4;
-// 	static const size_t READ_BUFFER_SIZE = 2048;
-// 	static const size_t CHUNK_BUFFER_SIZE = 2048;
 
 	Writer();
-	void reset(); // same state as juste after calling ctor
+// 	Writer(Writer const& other); // default segfaults ???
+	void reset(); // same state as just after calling ctor
 
 	/* Prepare Header */
 	// Note : `set_status` must be called BEFORE any call to `add_header_field`
@@ -34,32 +36,43 @@ public:
 	static const size_t READ_SIZE = 2048;
 	// Use content of file as body
 	// Return `true` if ok `false` if reading error 
-	bool read_body_from_file(int fd);
+// 	bool read_body_from_file(int fd);
+	bool read_body_from_stream(std::istream & f);
+
+	// Asks to attempt to stream the content of `f`
+	// as the body.
+	// Used to avoid allocating huge bodies.
+	void stream_file_to_body(std::ifstream & f);
 
 	// Append `s` to body
 	void body_append(std::string const& s);
 	void body_append(char * s, size_t n);
 
 	/* Size */
-	size_t body_size() const;
+// 	size_t body_size() const;
 
 	/* Write */
-	static const int WRITE_ERROR = -1, PARTIAL_WRITE = 0, OK_FINISHED = 1;
-	static const size_t MAX_WRITE_SIZE = 2048;
+	static const int 
+		READ_ERROR = -2, WRITE_ERROR = -1, PARTIAL_WRITE = 0, OK_FINISHED = 1;
+	static const size_t MAX_WRITE_SIZE = 8192;
 	// Write some data (as much as was sent by a single `send` call) 
 	// to `fd_out` (socket). use `send_opt` as last arg of `send`.
 	// 
 	// Returns values may be:
+	// 	Writer::READ_ERROR when streaming from an ifstream
 	// 	Writer::WRITE_ERROR
 	// 	Writer::PARTIAL_WRITE
 	// 	Writer::OK_FINISHED
 	int write_some(int fd_out, int send_opt = 0);
 
 private:
+	size_t _pos;
 	std::string _header;
 	std::string _body; 
-	size_t _pos;
 
+	bool _streaming;
+	Buf _rdbuf;
+	std::ifstream *_body_file;
 };
 
 #endif

@@ -8,7 +8,6 @@
 #include "HttpError.hpp"
 
 #include <iostream>
-Writer::Writer() : _pos(0) {}
 
 std::string get_mime_type(const std::string& file_path, MimeMap const& mimes)
 {
@@ -23,67 +22,89 @@ std::string get_mime_type(const std::string& file_path, MimeMap const& mimes)
         return "application/octet-stream";
 }
 
-void Writer::reset() {
-	using std::swap;
-	Writer tmp;
-	swap(_header, tmp._header);
-	swap(_body, tmp._body);
-	_pos = 0;
+size_t rem_stream_size(std::istream & in) {
+	if (!in)
+		return 0;
+	std::streampos cur, end;
+	cur = in.tellg();
+	in.seekg(0, std::ios_base::end);
+	end = in.tellg();
+	in.seekg(cur);
+	std::cerr << "file size" << end - cur << "\n";
+
+	return end - cur;
 }
 
-// TODO for chunks
-// int Writer::_write_once(int fd_out, int send_opt, str_) {
-// 	ssize_t wrbytes = send(
-// 			fd_out, _header.data() + _pos,
-// 		   	std::min((size_t) 8192, _header.size() - _pos), send_opt);
-// // 	(void) send_opt;
-// // 	ssize_t wrbytes = send( fd_out, _header.data() + _pos, _header.size() - _pos, SOCK_NONBLOCK);
-// 	std::cerr << "post write\n";
-// 	if (wrbytes < 0) {
-// 		return WRITE_ERROR;
-// 	}
-// 	std::cerr << "fd = " << fd_out << ", wrbytes = " << wrbytes << "\n";
+Writer::Writer() : _pos(0), _streaming(false), _body_file(NULL) {}
+
+// Writer::Writer(Writer const& other) {
+// 	_pos = other._pos;
+// 	_header = other._header;
+// 	_body = other._body;
 // 
-// // 	std::cerr << "just wrote:\n";
-// // 	write(2, _header.data() + _pos, std::min(wrbytes, (ssize_t) 20));
-// 	_pos += wrbytes;
-// // 	std::cerr << "\nbufpos(after):" << _pos << "\n";
-// 	return (_pos == _header.size() ? OK_FINISHED : PARTIAL_WRITE);
+// 	_streaming = other._streaming;
+// 	_rdbuf = other._rdbuf;
+// 	_body_file = other._body_file;
 // }
-// 
-// int Writer::write_some(int fd_out, int send_opt) {
-// 	if (_pos == 0) { // first write
-// 		if (_header.find("\r\ncontent-length:") == std::string::npos)
-// 			add_header_field("content-length", strof(body_size()));
-// 		_header += "\r\n";
-// 	}
-// 	if ( _chunked_mode ) {
-// 
-// 	} else {
-// 		_header += _body;
-// 	}
-// 	return _write_once;
-// }
+
+void Writer::reset() {
+	using std::swap;
+
+	_pos = 0;
+	_header = "";
+	_body = "";
+// 	swap(_header, std::string());
+// 	swap(_body, std::string());
+
+	_streaming = false;
+	_rdbuf = Buf();
+	_body_file = NULL;
+}
 
 int Writer::write_some(int fd_out, int send_opt) {
 	if (_pos == 0) { // first write
-		if (_header.find("\r\ncontent-length:") == std::string::npos)
-			add_header_field("content-length", strof(body_size()));
+		if (_header.find("\r\ncontent-length:") == std::string::npos) {
+			add_header_field(
+					"content-length", 
+					strof(_body_file ? rem_stream_size(*_body_file) : _body.size() ));
+		}
 		_header += "\r\n";
-		_header += _body;
+		if (!_body_file)
+			_header += _body;
 	}
 
-	ssize_t wrbytes = send(
-			fd_out, _header.data() + _pos,
-		   	std::min((size_t) MAX_WRITE_SIZE, _header.size() - _pos), send_opt);
-// 	std::cerr << "post write\n";
-	if (wrbytes < 0) {
-		return WRITE_ERROR;
+	ssize_t wrbytes;
+	if (!_streaming) {
+		wrbytes = send(
+				fd_out, _header.data() + _pos,
+				std::min((size_t) MAX_WRITE_SIZE, _header.size() - _pos), send_opt);
+		if (wrbytes < 0) {
+			return WRITE_ERROR;
+		}
+		_pos += wrbytes;
+		if (_pos == _header.size()) {
+			if (_body_file) {
+				_streaming = true;
+				return PARTIAL_WRITE;
+			} else {
+				return OK_FINISHED;
+			}
+		} else {
+			return PARTIAL_WRITE;
+		}
+	} else {
+		if ( !_body_file->is_open() )
+			return READ_ERROR;
+		_rdbuf.read_more(*_body_file);
+		if (_body_file->fail() && !_body_file->eof())
+			return READ_ERROR;
+		wrbytes = send(fd_out, _rdbuf.pos, _rdbuf.pending_bytes(), send_opt);
+		if (wrbytes < 0) {
+			return WRITE_ERROR;
+		}
+		_rdbuf.pos += wrbytes;
+		return _body_file->eof() ? OK_FINISHED : PARTIAL_WRITE;
 	}
-// 	std::cerr << "fd = " << fd_out << ", wrbytes = " << wrbytes << "\n";
-
-	_pos += wrbytes;
-	return (_pos == _header.size() ? OK_FINISHED : PARTIAL_WRITE);
 }
 
 void Writer::set_status(int code) {
@@ -99,12 +120,35 @@ void Writer::add_header_field(std::string const& key, std::string const& val) {
 	_header += val + "\r\n";
 }
 
-bool Writer::read_body_from_file(int fd) {
+// bool Writer::read_body_from_file(int fd) {
+// 	char buf[READ_SIZE];
+// 	ssize_t rdbytes;
+// 	while ( (rdbytes = read(fd, buf, READ_SIZE)) > 0 )
+// 		_body.append(buf, rdbytes);
+// 	return (rdbytes < 0 ? false : true ); // false -> reading error
+// }
+
+// bool Writer::read_body_from_stream(std::istream & f) {
+// 	char buf[READ_SIZE];
+// 	while (f.read(buf, READ_SIZE))
+// 		_body.append(buf, f.gcount());
+// 	return (f.fail() && !f.eof() ? false : true ); // false -> reading error
+// }
+
+bool Writer::read_body_from_stream(std::istream & f) {
 	char buf[READ_SIZE];
-	ssize_t rdbytes;
-	while ( (rdbytes = read(fd, buf, READ_SIZE)) > 0 )
-		_body.append(buf, rdbytes);
-	return (rdbytes < 0 ? false : true ); // false -> reading error
+	while (true) {
+		f.read(buf, READ_SIZE);
+		_body.append(buf, f.gcount());
+		if (f.eof())
+			return true;
+		if (f.fail())
+			return false;
+	}
+}
+
+void Writer::stream_file_to_body(std::ifstream & f) {
+	_body_file = &f;
 }
 
 void Writer::body_append(std::string const& s) {
@@ -119,6 +163,6 @@ void Writer::use_as_body(std::string & consume) {
 	_body.swap(consume);
 }
 
-size_t Writer::body_size() const {
-	return _body.size();
-}
+// size_t Writer::body_size() const {
+// 	return _body.size();
+// }

@@ -1,4 +1,8 @@
 #include <cstddef>
+#include <iostream>
+#include <sys/types.h>
+#include <sys/socket.h>
+
 #include "Buf.hpp"
 
 //DEBUG
@@ -20,19 +24,35 @@ Buf & Buf::operator=(Buf const& other) {
 	return *this;
 }
 
-size_t Buf::read_more(int sockfd) {
+size_t Buf::read_more(int sockfd, int sockopt) {
 	size_t remsz = end - pos;
 	memmove(start, pos, remsz);
 	end = start + remsz;
 	pos = start;
 
-	ssize_t rdbytes = read(sockfd, end, BUFSIZE - 1 - (end - start));
+	ssize_t rdbytes = recv(sockfd, end, BUFSIZE - 1 - (end - start), sockopt);
 	if (rdbytes < 0)
 		return rdbytes;
 
 	end += rdbytes;
 	*end = '\0'; // null byte (so we can use `strstr`)
 	return rdbytes;
+}
+
+size_t Buf::read_more(std::istream & in) {
+	if (in.fail())
+		return -1;
+
+	size_t remsz = end - pos;
+	memmove(start, pos, remsz);
+	end = start + remsz;
+	pos = start;
+
+	in.read(end, BUFSIZE - 1 - (end - start));
+
+	end += in.gcount();
+	*end = '\0';
+	return in.gcount();
 }
 
 bool Buf::full() const {

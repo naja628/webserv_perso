@@ -1,12 +1,11 @@
 #ifndef BUF_HPP
 # define BUF_HPP
 
-# include <unistd.h>
 # include <cstring>
+# include <iostream>
 
-#define BUFSIZE 4096
-// #define BUFSIZE 64
 struct Buf {
+	static const size_t BUFSIZE = 4096;
 	char start[BUFSIZE];
 	char * pos;
 	char * end;
@@ -17,7 +16,8 @@ struct Buf {
 	Buf(Buf const& other);
 	Buf & operator=(Buf const& other);
 	
-	size_t read_more(int sockfd); // TODO maybe pass recv options
+	size_t read_more(int sockfd, int sockopt = 0);
+	size_t read_more(std::istream & in);
 
 	bool full() const;
 	bool empty() const;
