@@ -374,6 +374,21 @@ std::cerr << "Files to 2000 full \n";
 	throw HttpError(500);
 }
 
+static std::string http_to_cgi_header(std::string const& s) {
+	typedef std::string::size_type Sz;
+
+	std::string res = "HTTP_";
+	res.reserve(s.size());
+
+	for (Sz i = 0; i < s.size(); ++i) {
+		if (s[i] == '-')
+			res.push_back('_');
+		else
+			res.push_back( toupper(s[i]) );
+	}
+	return res;
+}
+
 char	**CgiHandler::_setEnv(int fd1, int fd2)	// traduire les "./"	// exit a la place de return
 {
 	std::map<std::string, std::string>	env;
@@ -401,6 +416,11 @@ char	**CgiHandler::_setEnv(int fd1, int fd2)	// traduire les "./"	// exit a la p
 	env["SERVER_PROTOCOL"] = "HTTP/1.1";
 	env["SERVER_SOFTWARE"] = "spiderweb";	// spiderweb
 
+	typedef std::map<std::string, std::string>::const_iterator It;
+	for (It it = _pa.header().begin(); it != _pa.header().end(); ++it) {
+		if (it->first != "content-type")
+			env[ http_to_cgi_header(it->first) ] = it->second;
+	}
 	int	i = 0;
 	envTab = (char **)malloc(sizeof(char *) * (env.size() + 1));
 	if (!envTab)
@@ -420,6 +440,7 @@ char	**CgiHandler::_setEnv(int fd1, int fd2)	// traduire les "./"	// exit a la p
 		i++;
 	}
 	envTab[env.size()] = NULL;
+	printEnv(envTab);
 std::cerr << "env created\n";
 	return (envTab);
 }

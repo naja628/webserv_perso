@@ -342,13 +342,17 @@ static std::string str_tolower(std::string const& s) {
 short ConState::_prepare_cgi_page()
 {
 	std::cerr << "_cgi_prep\n";
-	std::string	tmp_str = _cgi.fileToStr(); // TODO use fstream
+// 	std::string	tmp_str = _cgi.fileToStr(); // TODO use fstream
+	_resp_file.get().open(_cgi.outFileName().data());
+	std::ifstream & ifs(_resp_file.get());
+	if (!ifs.is_open())
+		throw HttpError(500);
+// 	std::istringstream iss(tmp_str);
 	std::map<std::string, std::string> response_header;
-	std::istringstream iss(tmp_str);
 	while (true) {
 		std::string line;
-		std::getline(iss, line, '\n');
-		if (iss.fail())
+		std::getline(ifs, line, '\n');
+		if (ifs.fail())
 			throw HttpError(500);
 		if (line == "")
 			break;
@@ -377,7 +381,8 @@ short ConState::_prepare_cgi_page()
 
 // 	tmp_str = tmp_str.substr(iss.tellg());
 // 	_wr.use_as_body(tmp_str);
-	_wr.read_body_from_stream(iss); // TODO streaming
+// 	_wr.read_body_from_stream(iss); // TODO streaming
+	_choose_write_method();
 	_call_next = &ConState::_write;
 	return POLLOUT;
 }
