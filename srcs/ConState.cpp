@@ -74,6 +74,7 @@ short ConState::_get_first_request() {
 
 		_pconf->print(); // DEBUG
 		_cgi.setFilename();
+		_cgi.setConf(_pconf);
 		if ( _pa.status() == HttpParser::PREBODY )
 			return _dispatch();
 		else 
@@ -264,7 +265,7 @@ short ConState::_prepare_page() {
 
 	_cgi.setParser(_pa);	// dans isCgi()
 	_cgi.setRoot(locpath);	// dans isCgi()
-	_cgi.setExtensions(path_conf->cgi_extensions());
+// 	_cgi.setExtensions(path_conf->cgi_extensions());
 	if (_cgi.isCgi(path_conf->cgi_extensions()) == true)
 	{
 		_cgi.run();

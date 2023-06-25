@@ -17,7 +17,6 @@ class CgiHandler
 
 	public:
 
-
 	// constructors
 		CgiHandler();
 		CgiHandler(const CgiHandler &src);
@@ -33,7 +32,8 @@ class CgiHandler
 		void	setRoot(std::string root);
 		void	setParser(HttpParser pa);
 		void	setMethod(std::string method);
-		void	setExtensions(std::set<std::string> ext);
+// 		void	setExtensions(std::set<std::string> ext);
+		void	setConf(ServerConf const* conf);
 
 	// files operators
 		void		openFile(int method);	// dispatch
@@ -63,12 +63,12 @@ class CgiHandler
 		std::string							_root;	// pathConf(getter)
 		std::fstream						_fs_file;
 		std::map<std::string, std::string>	_header;
-		std::set<std::string>				_ext;
 		
 		int		_pid;
 		clock_t	_stopwatch;
 
 		HttpParser							_pa;
+		ServerConf const* _conf;
 
 	// launch utils
 		void		_launch();

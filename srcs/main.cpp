@@ -4,13 +4,23 @@
 #include "webserv.hpp"
 #include "Conf.hpp"
 #include "Quit.hpp"
+#include "path_utils.hpp"
 
 #ifndef DFL_CONF
 #define DFL_CONF "conf/server.conf"
 #endif
 
-int main(int ac, char **av)
+int main(int ac, char **av, char ** env)
 {
+	if (!bad_setcwd(env)) {
+		std::cerr 
+			<< "Warning: couldn't find environment variable `PWD`.\n"
+			<< "Cgi scripts may use wrong paths when config uses relative paths.\n"
+			<< "Consider exporting it manually\n";
+	} 
+	else // DEBUG
+		std::cerr << "cwd: " << bad_getcwd() << "\n";
+	
 	signal(SIGINT, sighook_quit);
  	// basic checks
  	std::ifstream conf_stream;

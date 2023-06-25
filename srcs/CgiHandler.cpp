@@ -1,4 +1,5 @@
 #include <cstdlib>
+#include <cstring>
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -18,6 +19,7 @@
 #include "Conf.hpp"
 #include "HttpParser.hpp"
 #include "HttpError.hpp"
+#include "path_utils.hpp"
 
 /****************************************************/
 /*                                                  */
@@ -30,6 +32,7 @@ CgiHandler::CgiHandler() : _pid(-1), _stopwatch(0)
 
 // copy
 CgiHandler::CgiHandler(const CgiHandler &src)
+	: _pid(-1), _stopwatch(0)
 {
 	*this = src;
 }
@@ -86,12 +89,9 @@ void	CgiHandler::setRoot(std::string root)
 	_root = root;
 }
 
-void	CgiHandler::setExtensions(std::set<std::string> ext)
-{
-	_ext = ext;
+void	CgiHandler::setConf(ServerConf const* conf) {
+	_conf = conf;
 }
-
-
 
 /****************************************************/
 /*                                                  */
@@ -291,10 +291,14 @@ void	CgiHandler::_launch()
 	if (dup2(fd2, STDOUT_FILENO) < 0)
 		_exit(fd1, fd2);
 
+	char	**envTab = _setEnv(fd1, fd2);	// close les fd
+printEnv(envTab);
+
 	std::string	pathDir = path.substr(0, path.find_last_of('/'));
 	if (chdir(pathDir.c_str()) < 0)	// check if good path
 	{
 std::cerr << "Couldn't change directory\n";
+		_freeTab(envTab);
 		_exit(fd1, fd2);
 	}
 
@@ -303,17 +307,18 @@ std::cerr << "Couldn't change directory\n";
 	else
 		_root.erase(0, pathDir.size());
 
-	char	**envTab = _setEnv(fd1, fd2);	// close les fd
-printEnv(envTab);
+// 	char	**envTab = _setEnv(fd1, fd2);	// close les fd
+// printEnv(envTab);
 
 	char *tab[2];
-	tab[0] = (char *)path.substr(path.find_last_of('/') + 1).c_str();
+	tab[0] = strdup(path.substr(path.find_last_of('/') + 1).c_str());
 	tab[1] = NULL;
 
 std::cerr << "-> exec to: " << tab[0] << '\n';
 	execve(path.substr(path.find_last_of('/') + 1).c_str(), tab, envTab);	// change path, because of chdir()	// path.c_str()
 std::cerr << "-> couldn't execute\n\n";
 
+	free(tab[0]);
 	_freeTab(envTab);
 	_exit(fd1, fd2);
 }
@@ -400,7 +405,8 @@ char	**CgiHandler::_setEnv(int fd1, int fd2)	// traduire les "./"	// exit a la p
 	env["GATEWAY_INTERFACE"] = "CGI/1.1";
 
 	env["PATH_INFO"] = _getPathInfo();
-	env["PATH_TRANSLATED"] = "";	// locPath
+	env["PATH_TRANSLATED"] 
+		= canonize_path(_conf->translate_path(env["PATH_INFO"]));
 
 	env["QUERY_STRING"] = (_getStrInfo(_pa.uri(), '?', 1) != "" ?
 		_getStrInfo(_pa.uri(), '?', 1) : _getStrInfo(_pa.uri(), ';', 1));
@@ -410,7 +416,8 @@ char	**CgiHandler::_setEnv(int fd1, int fd2)	// traduire les "./"	// exit a la p
 
 	env["REQUEST_METHOD"] = _method;
 	env["SCRIPT_NAME"] = _getPath();	// /cgi-bin/process.php	// problem while print (".")
-	env["SCRIPT_FILENAME"] = "";	// how to know without getcwd() ?
+	env["SCRIPT_FILENAME"]
+		= canonize_path(_conf->translate_path(env["SCRIPT_NAME"]));
 	env["SERVER_NAME"] = _getStrInfo(_getFromHeader("host"), ':', 0);
 	env["SERVER_PORT"] = _getStrInfo(_getFromHeader("host"), ':', 1);
 	env["SERVER_PROTOCOL"] = "HTTP/1.1";

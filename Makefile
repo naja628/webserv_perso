@@ -16,7 +16,8 @@ SRCS		=	main.cpp \
 				Writer.cpp \
 				Conf.cpp \
 				Quit.cpp \
-				CgiHandler.cpp
+				CgiHandler.cpp \
+				path_utils.cpp
 
 OBJS		=	${addprefix $(OBJDIR), $(SRCS:%.cpp=%.o)}
 

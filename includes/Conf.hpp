@@ -184,6 +184,7 @@ public:
 // 	VirtualServers const& parse_conf(std::istream & in);
 	std::set<int> const& ports() const;
 	void parse_conf(std::istream & in);
+	// note : can be invalidated by modifying `*this`
 	ServerConf const* get_server_conf(int port, std::string const& hostname) const;
 	MimeMap const& mime_map() const;
 
