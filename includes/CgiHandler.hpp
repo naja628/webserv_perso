@@ -33,7 +33,7 @@ class CgiHandler
 		void	setRoot(std::string root);
 		void	setParser(HttpParser pa);
 		void	setMethod(std::string method);
-		void	setConf(const ServerConf *pconf);
+		void	setExtensions(std::set<std::string> ext);
 
 	// files operators
 		void		openFile(int method);	// dispatch
@@ -62,6 +62,7 @@ class CgiHandler
 		std::string							_root;	// pathConf(getter)
 		std::fstream						_fs_file;
 		std::map<std::string, std::string>	_header;
+		std::set<std::string>				_ext;
 		
 		int		_pid;
 		clock_t	_stopwatch;
@@ -83,7 +84,7 @@ class CgiHandler
 		std::string	_getStrInfo(std::string str, char c, int method);
 		bool		_fileExists(std::string path);
 		std::string	_getPathInfo();
-		std::string	_getPath(int method);
+		std::string	_getPath();
 		void		_freeTab(char **envTab);
 
 };
