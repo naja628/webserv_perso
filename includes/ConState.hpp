@@ -76,7 +76,6 @@ private:
 	void _prepare_error(HttpError e);
 	
 	// utils
-	void ConState::_choose_write_method() {
 	std::string	_dir_list(DIR *dir, std::string path);
 	std::string _generate_error_page(int errcode) const;
 	void _choose_write_method();
