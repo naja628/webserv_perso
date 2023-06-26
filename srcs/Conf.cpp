@@ -279,8 +279,7 @@ PathConf const* Paths::get_conf (
 				conf.root() + (islash >= canon_path.size()? "" : canon_path.substr(islash));
 			return &conf;
 		}
-// 	} while ( ( islash = prefix.rfind('/') ) != std::string::npos);
-	} while (!(prefix == "" || prefix == "/"));
+	} while (prefix != "/" && ( islash = prefix.rfind('/') ) != std::string::npos);
 	return NULL;
 }
 
