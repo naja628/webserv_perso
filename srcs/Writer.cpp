@@ -2,7 +2,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <algorithm> // just for `min`
+#include <algorithm>
 #include "nat_utils.hpp"
 #include "Writer.hpp"
 #include "HttpError.hpp"
@@ -30,22 +30,11 @@ size_t rem_stream_size(std::istream & in) {
 	in.seekg(0, std::ios_base::end);
 	end = in.tellg();
 	in.seekg(cur);
-	std::cerr << "file size" << end - cur << "\n";
 
 	return end - cur;
 }
 
 Writer::Writer() : _pos(0), _streaming(false), _body_file(NULL) {}
-
-// Writer::Writer(Writer const& other) {
-// 	_pos = other._pos;
-// 	_header = other._header;
-// 	_body = other._body;
-// 
-// 	_streaming = other._streaming;
-// 	_rdbuf = other._rdbuf;
-// 	_body_file = other._body_file;
-// }
 
 void Writer::reset() {
 	using std::swap;
@@ -53,8 +42,6 @@ void Writer::reset() {
 	_pos = 0;
 	_header = "";
 	_body = "";
-// 	swap(_header, std::string());
-// 	swap(_body, std::string());
 
 	_streaming = false;
 	_rdbuf = Buf();
@@ -120,21 +107,6 @@ void Writer::add_header_field(std::string const& key, std::string const& val) {
 	_header += val + "\r\n";
 }
 
-// bool Writer::read_body_from_file(int fd) {
-// 	char buf[READ_SIZE];
-// 	ssize_t rdbytes;
-// 	while ( (rdbytes = read(fd, buf, READ_SIZE)) > 0 )
-// 		_body.append(buf, rdbytes);
-// 	return (rdbytes < 0 ? false : true ); // false -> reading error
-// }
-
-// bool Writer::read_body_from_stream(std::istream & f) {
-// 	char buf[READ_SIZE];
-// 	while (f.read(buf, READ_SIZE))
-// 		_body.append(buf, f.gcount());
-// 	return (f.fail() && !f.eof() ? false : true ); // false -> reading error
-// }
-
 bool Writer::read_body_from_stream(std::istream & f) {
 	char buf[READ_SIZE];
 	while (true) {
@@ -162,7 +134,3 @@ void Writer::body_append(char * s, size_t n) {
 void Writer::use_as_body(std::string & consume) {
 	_body.swap(consume);
 }
-
-// size_t Writer::body_size() const {
-// 	return _body.size();
-// }

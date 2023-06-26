@@ -5,9 +5,6 @@
 
 #include "Buf.hpp"
 
-//DEBUG
-#include <cstdio>
-
 Buf::Buf() : pos(start), end(start) {}
 
 // Canonical form:

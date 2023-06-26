@@ -22,7 +22,7 @@
 #include "CgiHandler.hpp"
 
 // DEBUG
-#include <iostream>
+//#include <iostream>
 
 //void print_header(HttpParser const& pa)
 //{
@@ -38,9 +38,7 @@
 ConState::ConState(int fd, VirtualServers const* confs, int port)
 	: _fd(fd), _port(port), _event_set(POLLIN), _confs(confs),
       _cgi(), _call_next(&ConState::_get_first_request)
-{
-	std::cerr << "Constate ctor\n";
-}
+{}
 
 void ConState::init(int fd, VirtualServers const* confs, int port) {
 	_fd = fd;
@@ -58,7 +56,6 @@ short ConState::_get_new_request() {
 }
 
 short ConState::_get_first_request() {
-	std::cerr << "_get_first_request\n";
 
 	BufAdaptor wbuf(_in_buf);
 	_pa.parse_some(wbuf);
@@ -72,7 +69,8 @@ short ConState::_get_first_request() {
 		if (!_pconf)
 			return 0;
 
-		_pconf->print(); // DEBUG
+		std::clog << "New connection on port [" << _port << "]\n";
+
 		_cgi.setFilename();
 		_cgi.setConf(_pconf);
 		if ( _pa.status() == HttpParser::PREBODY )
@@ -90,7 +88,6 @@ short ConState::_get_first_request() {
 
 short ConState::_get_request()
 {
-	std::cerr << "_get_request\n";
 	_call_next = &ConState::_get_request;
 	BufAdaptor wbuf(_in_buf);
 	if ( _pa.parse_some(wbuf) != HttpParser::PREBODY )
@@ -100,9 +97,9 @@ short ConState::_get_request()
 }
 
 short ConState::_dispatch() {
-	std::cerr << "_dispatch\n";
 
-	PathConf const* path_conf = _pconf->path_conf(_pa.uri()/*.path()*/);
+	std::clog << "New request: " << _pa.method() << " " << _pa.uri() << " HTTP/1.1\n";
+	PathConf const* path_conf = _pconf->path_conf(_pa.uri());
 	if ( !path_conf )
 		throw HttpError(404);
 	if ( !path_conf->accepted_methods().count(_pa.method()) ) // method not accepted
@@ -116,9 +113,6 @@ short ConState::_dispatch() {
 		return POLLOUT;
 	}
 
-
-	// TODO discard body for GET and DELETE
-	// maybe have -1 stream to nothing or something
 	if ( _pa.method() == "POST" )
 	{
 		_chunk_streamer = ChunkStreamer(); // reset
@@ -136,7 +130,6 @@ short ConState::_dispatch() {
 
 	if ( _pa.method() == "GET" )
 	{
-		std::cerr << "got GET\n";
 		_cgi.setMethod("GET");
 		return _prepare_page();
 	}
@@ -166,7 +159,6 @@ short ConState::_read_body()
 	if (   _pa.header().count("transfer-encoding")
 		&& _pa.header().at("transfer-encoding") == "chunked" )
 	{
-		std::cerr << "_read_chunked\n";
 		if ( _pconf->max_body() > 0 )
 			_chunk_streamer.set_max_size(_pconf->max_body() );
 		if ( _chunk_streamer.read_some_chunked(_in_buf, _cgi) != ChunkStreamer::DONE)
@@ -185,11 +177,9 @@ short ConState::_read_body()
 			_chunk_streamer.set_chunk_size(length);
 		}
 
-		std::cerr << "_read_single\n";
 		if ( _chunk_streamer.read_some_single(_in_buf, _cgi) != ChunkStreamer::DONE)
 			return POLLIN; // still streaming the body
-		else 
-			std::cerr << "body done\n";
+		// body done
 	}
 
 	_cgi.closeFile();
@@ -251,7 +241,6 @@ void ConState::_choose_write_method() {
 }
 
 short ConState::_prepare_page() {
-	std::cerr << "_prepare_page\n";
 
 	_wr.reset();
 	// find relevant path_conf :
@@ -260,12 +249,9 @@ short ConState::_prepare_page() {
 	if (!path_conf) {
 		throw HttpError(404);
 	}
-	std::cerr << "transalted path: " << locpath << "\n"; // DEBUG
-
 
 	_cgi.setParser(_pa);	// dans isCgi()
 	_cgi.setRoot(locpath);	// dans isCgi()
-// 	_cgi.setExtensions(path_conf->cgi_extensions());
 	if (_cgi.isCgi(path_conf->cgi_extensions()) == true)
 	{
 		_cgi.run();
@@ -278,10 +264,8 @@ short ConState::_prepare_page() {
 
 	DIR * dir;
 	if ( (dir = opendir(locpath.data())) ) { // if directory
-// 		int fd;
 		// try to use 'index'
 		std::string index_path = path_conf->index();
-		std::cerr << "**index path**: " <<  index_path << "\n";
 		if (index_path != "")
 			_resp_file.get().open(_pconf->translate_path(index_path).data());
 		if (_resp_file.get().is_open())
@@ -315,7 +299,6 @@ short ConState::_prepare_page() {
 }
 
 short ConState::_wait_cgi() {
-std::cerr << "wait for child\n";
 	if (_cgi.waitChild() == true)
 		return POLLOUT;
 	else
@@ -342,13 +325,11 @@ static std::string str_tolower(std::string const& s) {
 
 short ConState::_prepare_cgi_page()
 {
-	std::cerr << "_cgi_prep\n";
-// 	std::string	tmp_str = _cgi.fileToStr(); // TODO use fstream
 	_resp_file.get().open(_cgi.outFileName().data());
 	std::ifstream & ifs(_resp_file.get());
 	if (!ifs.is_open())
 		throw HttpError(500);
-// 	std::istringstream iss(tmp_str);
+
 	std::map<std::string, std::string> response_header;
 	while (true) {
 		std::string line;
@@ -364,7 +345,6 @@ short ConState::_prepare_cgi_page()
 			= trim(line.substr(icolon + 1));
 	}
 
-	std::cerr << "parsed response header\n";
 	_wr.reset();
 	if (response_header.count("status")) {
 		_wr.set_status(from_str<int>(response_header.at("status"), HttpError(500)));
@@ -380,16 +360,12 @@ short ConState::_prepare_cgi_page()
 	if (!response_header.count("content-type"))
 		_wr.add_header_field("content-type", "text/html");
 
-// 	tmp_str = tmp_str.substr(iss.tellg());
-// 	_wr.use_as_body(tmp_str);
-// 	_wr.read_body_from_stream(iss); // TODO streaming
 	_choose_write_method();
 	_call_next = &ConState::_write;
 	return POLLOUT;
 }
 
 short ConState::_write() {
-	std::cerr << "_write\n";
 	switch (_wr.write_some(_fd)) {
 		default:
 		case Writer::WRITE_ERROR:
@@ -443,12 +419,11 @@ void ConState::_prepare_error(HttpError e) {
 	_wr.set_status(e);
 	_wr.add_header_field("content-type", "text/html");
 
-	if (e == 405) // allow field needed to specify supported methods
+	if (e == 405) // 'allow' field needed to specify supported methods
 		add_allowed_methods(_wr, _pconf->path_conf(_pa.uri()));
 
 	std::string const* error_path;
 	if ( (error_path = _pconf->error_page(e)) ) {
-		std::cerr << "found error page" << std::endl;
 		std::string translated_path = _pconf->translate_path(*error_path);
 		_resp_file.get().open(translated_path.data());
 		if (!_resp_file.get().is_open())
@@ -481,7 +456,6 @@ short ConState::operator() (short pollflags)
 	try {
 		_event_set = (this->*_call_next)();
 	} catch (HttpError e) {
-		std::cerr << "Caught http error: " << e << std::endl;
 		_prepare_error(e);
 		if (_chunk_streamer.status() == ChunkStreamer::DONE)
 			_call_next = &ConState::_write;

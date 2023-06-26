@@ -118,16 +118,6 @@ std::string const& PathConf::uploads_directory() const {
 	return _get(&PathConf::_uploads_directory, UPDIR);
 }
 
-/* UTILS */
-// bool PathConf::is_cgi(std::string const& path) const {
-// 	if (cgi_extensions.count("ALL"))
-// 		return true;
-// 	//                      (remove query                ) (extension)      
-// 	std::string extension = path.substr(0, path.find('?')).rfind('.');
-// 	if (cgi_extensions.count(extension))
-// 		return true;
-// 	return false;
-// }
 
 /* STREAM UTILS */
 
@@ -168,80 +158,6 @@ static std::istream & read_quoted(
 	return in;
 }
 
-// static std::string simplify_path(std::string const& path) {
-// 	bool is_abs_path = (path.size() >= 1 && path[0] == '/');
-// 	std::vector<std::string> segments;
-// 
-// 	std::string::size_type seg_start = 0, seg_stop;
-// 	while (true) { // break inside
-// 		// skip slashes
-// 		while (seg_start < path.size() && path[seg_start] == '/')
-// 			++seg_start;
-// 		if (seg_start >= path.size()) // `>=` important bc could be `npos`
-// 			break;
-// 
-// 		// build current segment
-// 		seg_stop = path.find('/', seg_start);
-// 		std::string segment = path.substr(seg_start, seg_stop - seg_start);
-// 		seg_start = seg_stop;
-// 
-// 		// cases (update `segments`)
-// 		if (segment == ".")
-// 			continue;
-// 		else if (segment == "..") {
-// 			if (!segments.empty())
-// 				segments.pop_back();
-// 		} else {
-// 			segments.push_back(segment);
-// 		}
-// 	}
-// 
-// 	std::string res = is_abs_path ? "/" : "";
-// 
-// 	if ( segments.empty() ) {
-// 		return res;
-// 	} else {
-// 		res += segments.front();
-// 		typedef std::vector<std::string>::const_iterator It;
-// 		for (It it = ++segments.begin(); it != segments.end(); ++it) {
-// 			res += "/" + *it;
-// 		}
-// 		return res;
-// 	}
-// }
-
-// static std::string simplify_path(std::string const& path) {
-// 	std::string res;
-// 	if (path.size() > 0 && path[0] == '/')
-// 		res = "/";
-// 
-// 	std::string::size_type pos = 0;
-// 	while (true) {
-// 		// get segment
-// 		while (pos < path.size() && path[pos] == '/')
-// 			++pos;
-// 		if (pos >= path.size() ) {
-// 			if (res != "" && res != "/")
-// 				res.resize(res.size() - 1); // rm trailing '/'
-// 			return res;
-// 		}
-// 		std::string segment = path.substr(pos, path.find('/', pos) - pos);
-// 		pos += segment.size();
-// 
-// 		// . -> ignore, .. crop result, else append "/" + segment
-// 		if (segment == ".") {
-// 			continue;
-// 		} else if (segment == "..") {
-// 			std::string::size_type last_slash = res.rfind('/', res.size() - 2);
-// 			if (last_slash == std::string::npos)
-// 				res = "";
-// 			else
-// 				res.resize(last_slash + 1);
-// 		} else { 
-// 			res += segment + "/";
-// 		}
-// 	}
-// }
 
 /* Paths */
 
@@ -309,8 +225,6 @@ SSet Paths::_read_set(std::istream & in) {
 	SSet sset;
 	std::string elem;
 	while ( !expect(in, ";") ) {
-		// 			if ( !member(in.peek(), SP) )
-		// 				throw ParsingException(in, "expected space");
 		if ( !read_quoted(in, elem) )
 			throw ParsingException(in, "bad syntax");
 		sset.insert(elem);
@@ -405,17 +319,17 @@ long ServerConf::max_body() const {
 }
 
 // DEBUG
-#include <iostream>
-void ServerConf::print() const {
-	std::cout << "Conf:\n";
-	std::cout << "\tports:";
-	print_range(_ports.begin(), _ports.end());
-	std::cout << "\tnames: ";
-	print_range(_names.begin(), _names.end());
-	std::cout << "\tmax_body:" << _max_body << "\n";
-	std::cout << "\terror_pages:";
-	print_range(_error_pages.begin(), _error_pages.end());
-}
+//#include <iostream>
+//void ServerConf::print() const {
+//	std::cout << "Conf:\n";
+//	std::cout << "\tports:";
+//	print_range(_ports.begin(), _ports.end());
+//	std::cout << "\tnames: ";
+//	print_range(_names.begin(), _names.end());
+//	std::cout << "\tmax_body:" << _max_body << "\n";
+//	std::cout << "\terror_pages:";
+//	print_range(_error_pages.begin(), _error_pages.end());
+//}
 
 /* VirtualServers */
 
@@ -605,92 +519,3 @@ void parseMimeTypes(std::string const& filePath, MimeMap& mimeTypes, std::istrea
 }
 
 #undef SP
-
-/* TEST */
-#ifdef TEST
-#include <cstdlib>
-#include <fstream>
-void print_path_conf(PathConf const& conf) {
-	std::cout << "Conf:\n";
-	std::cout << "\taccepted_methods: ";
-	print_range(conf.accepted_methods().begin(), conf.accepted_methods().end());
-	std::cout << "\troot: " << conf.root() << "\n";
-	std::cout << "\tdirectory_listing: " << conf.directory_listing() << "\n";
-	std::cout << "\tindex: " << conf.index() << "\n";
-	std::cout << "\tcgi_extensions: ";
-	print_range(conf.cgi_extensions().begin(), conf.cgi_extensions().end());
-	std::cout << "\tuploads_directory: " << conf.uploads_directory() << "\n";
-}
-
-#if 0
-int main(int ac, char ** av) {
-	if (ac != 2) {
-		std::cerr << "Usage: " << av[0] << " <config_file>\n";
-		return EXIT_FAILURE;
-	}
-
-	Paths paths; 
-	std::ifstream conf_stream;
-	conf_stream.open(av[1]);
-	if (!conf_stream) {
-		std::cerr << "Error opening file\n";
-		return EXIT_FAILURE;
-	}
-
-	try {
-		paths.parse_file(conf_stream);
-		while (std::cin) {
-			std::string line;
-			getline(std::cin, line);
-
-			std::string translated_path;
-			PathConf const* conf = paths.get_conf(line, translated_path);
-			if (!conf) {
-				std::cerr << "no match \n";
-				continue;
-			}
-			std::cout << "translated path: " << translated_path << "\n";
-			print_path_conf(*conf);
-		}
-		return EXIT_SUCCESS;
-	} catch (char const* errmsg) {
-		std::cerr << errmsg << "\n";
-		return EXIT_FAILURE;
-	} catch (std::string const& errmsg) {
-		std::cerr << errmsg << "\n";
-		return EXIT_FAILURE;
-	}
-}
-#endif
-
-#include <sstream>
-int main(int ac, char ** av) {
-	if (ac != 2) {
-		std::cerr << "Usage: " << av[0] << " <config_file>\n";
-		return EXIT_FAILURE;
-	}
-
-	std::ifstream conf_stream;
-	conf_stream.open(av[1]);
-	try {
-		VirtualServers const servs(conf_stream); 
-		std::cout << "parsed conf" << std::endl;
-
-		int port;
-		std::string hostname;
-		while ( std::cin >> port >> hostname ) {
-			std::cout << "hello" << std::endl;
-			ServerConf const* pserv = servs.get_server_conf(port, hostname);
-			if (pserv)
-				pserv->print();
-			else
-				std::cout << "no match\n";
-		}
-		return std::cin.eof() ? EXIT_SUCCESS : EXIT_FAILURE;
-	} catch (ParsingException const& e) {
-		e.print_error(std::cerr);
-		return EXIT_FAILURE;
-	}
-}
-
-#endif

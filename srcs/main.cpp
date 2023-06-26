@@ -18,9 +18,7 @@ int main(int ac, char **av, char ** env)
 			<< "Cgi scripts may use wrong paths when config uses relative paths.\n"
 			<< "Consider exporting it manually\n";
 	} 
-	else // DEBUG
-		std::cerr << "cwd: " << bad_getcwd() << "\n";
-	
+
 	signal(SIGINT, sighook_quit);
  	// basic checks
  	std::ifstream conf_stream;
@@ -53,12 +51,11 @@ int main(int ac, char **av, char ** env)
 		try {
 			Server serv(servers);
 			serv.launchServer();
-			std::cerr << "normal exit" << std::endl;
 			return 0;
 		}
 		catch (const std::bad_alloc& e)
 		{
-			std::cerr << "in bad alloc\n";
+			std::clog << "RAM overload: restart server" << std::endl;
 		}
 		catch (const std::exception& e)
 		{

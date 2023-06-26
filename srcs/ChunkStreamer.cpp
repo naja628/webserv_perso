@@ -15,6 +15,7 @@
 
 #define INSUFFICIENT_DATA 0
 #define FUN_OK 1
+
 ChunkStreamer::ChunkStreamer(int fd)
 	: _wrfd(fd), _status(CHUNK_PREFIX), _rem_chunk_size(0),
 	  _max_allowed_size(0), _min_expected_size(0)
@@ -33,7 +34,6 @@ void ChunkStreamer::set_max_size(size_t max_size) {
 ChunkStreamer::Status ChunkStreamer::read_some_chunked(Buf & buf, CgiHandler &cgi) {
 	while (1) {
 		if (_status == TRAILER) {
-			// TODO maybe append to parser instead
 			return _discard_trailer(buf) ? DONE : TRAILER;
 		}
 		switch (_status) {
@@ -41,7 +41,7 @@ ChunkStreamer::Status ChunkStreamer::read_some_chunked(Buf & buf, CgiHandler &cg
 				if (_get_chunk_size(buf) == INSUFFICIENT_DATA)
 					return (_status = CHUNK_PREFIX);
 				_min_expected_size += _rem_chunk_size;
-				//
+
 				if (_rem_chunk_size == 0) {
 					_status = TRAILER;
 					break;
@@ -76,11 +76,8 @@ ChunkStreamer::Status ChunkStreamer::read_some_single(Buf & buf, CgiHandler &cgi
 }
 
 bool ChunkStreamer::_stream_chunk_payload(Buf & buf, CgiHandler &cgi) {
-//	size_t data_size = buf.end - buf.pos;
 	ssize_t wrbytes;
 	wrbytes = cgi.bodyInFile(buf, _rem_chunk_size);
-//	wrbytes = write(_wrfd, buf.pos, std::min(_rem_chunk_size, data_size));
-	// if (wrbytes < 0) ... TODO
 	buf.pos += wrbytes;
 	_rem_chunk_size -= wrbytes;
 	return (_rem_chunk_size == 0? FUN_OK : INSUFFICIENT_DATA);
@@ -110,8 +107,6 @@ bool ChunkStreamer::_get_chunk_size(Buf & buf) {
 	std::istringstream ss(hex_repr);
 	ss >> std::hex;
 	ss >> _rem_chunk_size;
-	// TODO maybe validate extension
-	//dprintf(2, "%d %d %d %s\n", (int) ((bool) ss), (int) ss.fail(), (int) ss.eof(), ss.str().data());
 	if ( !(ss.peek() == ';' || ss.eof()) )
 		throw HttpError(400);
 
@@ -122,7 +117,7 @@ bool ChunkStreamer::_get_chunk_size(Buf & buf) {
 bool ChunkStreamer::_expect_crlf(Buf & buf) {
 	if (buf.pending_bytes() < 2)
 		return INSUFFICIENT_DATA;
-	//
+
 	if (buf.passover("\r\n"))
 		return FUN_OK;
 	else 

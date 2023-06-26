@@ -9,26 +9,26 @@
 #include <fcntl.h>
 #include <sstream>
 
+#include "nat_utils.hpp"
+
 Server::Server(VirtualServers const& conf) 
 	: _m_NPorts(0), _m_conf(conf)
 {}
 
-//Server::Server(const Server& other) {}
 Server::~Server() {
-	std::cerr << "server dtor\n";
 	for (size_t i = 0; i < _m_fds.size(); ++i) {
 		close( _m_fds[i].fd );
 	}
 }
 
-Server Server::operator= (const Server& other)
-{
-	if (&other != this)
-	{
-		;
-	}
-	return *this;
-}
+//Server Server::operator= (const Server& other)
+//{
+//	if (&other != this)
+//	{
+//		;
+//	}
+//	return *this;
+//}
 
 void Server::_m_setListen(const int port)
 {
@@ -69,9 +69,12 @@ void Server::launchServer(void)
 	struct sockaddr_in cli_addr;
 	socklen_t cli_addr_size = sizeof(cli_addr_size);
 
+	std::clog << "Servers are ready.\n" << "Listening on ports: ";
+	print_range(_m_ports.begin(), _m_ports.end());
+
 	while (1)
 	{
-		events = poll(_m_fds.data(), _m_fds.size(), 5000);	// poll: check les eventuelles connections
+		events = poll(_m_fds.data(), _m_fds.size(), 5000);	// poll: check for new connections
 		if ( Quit::set() )
 			return ;
 		if (events == -1)
@@ -79,17 +82,14 @@ void Server::launchServer(void)
 
 		for (size_t current = 0; current != _m_NPorts; current++)
 		{
-			if (_m_fds[current].revents & POLLIN)	// si il y a une nouvelle connection sur un port
+			if (_m_fds[current].revents & POLLIN)
 			{
-				cli_sock = accept(_m_fds[current].fd, (struct sockaddr*) &cli_addr, &cli_addr_size);	// accepte la connection et cree la socket
+				cli_sock = accept(_m_fds[current].fd, (struct sockaddr*) &cli_addr, &cli_addr_size);
 				if (cli_sock == -1)
 					continue;
 
-				std::cout << "new connection on fd: " << cli_sock << std::endl;
-				_m_addFd(cli_sock);	// rajoute la nouvelle socket
-// 				_m_con_map[cli_sock] = ConState(cli_sock, &_m_conf, _m_ports[current]); // cree constate qui check l'etat de la socket/connection
+				_m_addFd(cli_sock);
 				_m_con_map[cli_sock].init(cli_sock, &_m_conf, _m_ports[current]);
-//				_m_con_map[cli_sock].init_cgi();
 			}
 		}
 
@@ -98,13 +98,12 @@ void Server::launchServer(void)
 			struct pollfd * cur = &_m_fds[current];
 			if (cur->revents)
 			{
-				std::cerr << "pre work\n";
 				ConState& worker = _m_con_map[cur->fd];
 				worker(cur->revents);
 				cur->events = worker.event_set();
 				if (!cur->events)
 				{
-					std::cout << "end conn" << std::endl;
+					std::clog << "Closing connection" << std::endl;
 					close(cur->fd);
 					_m_con_map.erase(_m_con_map.find(cur->fd));
 					_m_fds.erase(_m_fds.begin() + current--);
@@ -114,17 +113,6 @@ void Server::launchServer(void)
 			}
 		}
 		
-		std::cerr << "out of for.\n";
-		std::cerr << "listen fds:\n";
-		for (size_t current = 0; current < _m_NPorts; current++) {
-			std::cerr << _m_fds[current].fd << ", ";
-		}
-		std::cerr << std::endl;
-		std::cerr << "active fds:\n";
-		for (size_t current = _m_NPorts; current < _m_fds.size(); current++) {
-			std::cerr << _m_fds[current].fd << ", ";
-		}
-		std::cerr << std::endl;
 	}
 }
 

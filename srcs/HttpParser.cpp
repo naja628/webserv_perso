@@ -1,6 +1,5 @@
 #include <string>
 #include <map>
-// #include "RotBuf.hpp"
 #include "HttpError.hpp"
 #include "nat_utils.hpp"
 #include "HttpParser.hpp"
@@ -49,14 +48,6 @@ static std::string untilset(BufType & buf, char const* charset) {
 		res.push_back( buf.get() );
 	return res;
 }
-
-// advance the read position of `buf` to the first character not in `charset`
-// `charset` SHALL be null-terminated.
-//
-// static void skipset(BufType& buf, char const* charset) {
-// 	while ( member(buf.peek(), charset) )
-// 		buf.get();
-// }
 
 // if `buf` starts with `match`:
 //     move read position just after the matched content; return `true`;
@@ -125,9 +116,8 @@ HttpParser::Status HttpParser::parse_line(BufType& buf) {
 		case PREBODY:
 			return _status;
 			break;
-
-// 		default:
-// 			break;
+ 		default:
+ 			break;
 	}
 	if ( !passover(buf, _nl.data()) )
 		throw HttpError(400);
@@ -143,23 +133,6 @@ HttpParser::Status HttpParser::parse_some(BufType& buf) {
 	return _status;
 }
 
-// bool HttpParser::header_has(std::string const& key) const {
-// 	return (_header.find(key) != _header.end());
-// }
-// 
-// bool HttpParser::header_has(
-// 		std::string const& key,
-// 	   	std::string const& value
-// 		) const
-// {
-// 	typedef std::map<std::string, std::string>::const_iterator It;
-// 
-// 	It it = _header.find(key);
-// 	if (it != _header.end() && it->second == value)
-// 		return true;
-// 	return false;
-// }
-
 void HttpParser::_parse_start_line(BufType& buf) {
 	_method = untilset(buf, WHITESPACE);
 	if ( !passover(buf, " ") )
@@ -168,7 +141,6 @@ void HttpParser::_parse_start_line(BufType& buf) {
 	if ( !member(_method, SUPPORTED_METHODS, 3) )
 		throw HttpError(501);
 
-	// OK for uri to be emtpy ? (TODO)
 	_uri = untilset(buf, WHITESPACE); 
 	if ( !passover(buf, " ") )
 		throw HttpError(400);
@@ -209,9 +181,8 @@ void HttpParser::_parse_header_line(BufType& buf) {
 			break;
 		case ':' :
 			buf.get();
-			// TODO maybe change the way we normalize the value
 			value = trim( untilset(buf, "\r") );
-			//
+
 			if ( _header.find(key) == _header.end() )
 				_header[key] = value;
 			else 

@@ -6,7 +6,7 @@
 /*   By: mbucci <marvin@42.fr>                      +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2023/04/24 16:39:14 by mbucci            #+#    #+#             */
-/*   Updated: 2023/06/14 11:54:50 by mdelforg         ###   ########.fr       */
+/*   Updated: 2023/06/26 17:10:51 by mdelforg         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -24,10 +24,8 @@ class Server
 {
 	public:
 		Server(VirtualServers const& conf);
-		//Server(const Server& other);
 		// TODO: add config constructor
 		virtual ~Server();
-		Server operator= (const Server& other);
 
 		void launchServer();
 
@@ -72,6 +70,9 @@ class Server
 		};
 
 	private:
+		Server(const Server& other);	// deactivate
+		Server operator= (const Server& other);	// deactivate
+
 		// config oject;
 		size_t _m_NPorts;
 		std::vector<struct pollfd> _m_fds;

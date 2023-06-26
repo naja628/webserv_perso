@@ -10,7 +10,7 @@
 # include "HttpParser.hpp"
 # include "Conf.hpp"
 
-# define CGI_TIMEOUT 0.3
+# define CGI_TIMEOUT 1
 
 class CgiHandler
 {
@@ -32,7 +32,6 @@ class CgiHandler
 		void	setRoot(std::string root);
 		void	setParser(HttpParser pa);
 		void	setMethod(std::string method);
-// 		void	setExtensions(std::set<std::string> ext);
 		void	setConf(ServerConf const* conf);
 
 	// files operators
@@ -40,7 +39,6 @@ class CgiHandler
 		void		closeFile();
 		void		rmFile();
 		ssize_t		bodyInFile(Buf & buf, size_t rem_chunk_size);
-		void		clearDirectory(std::string dirPath);
 		std::string	fileToStr();
 		std::string const& outFileName() const;
 
@@ -57,10 +55,10 @@ class CgiHandler
 	private:
 
 	// variables
-		std::string							_method;	// set dans ConState
-		std::string							_fileBuf;	// full path
-		std::string							_fileExec;	// fileBuf + "_exec"
-		std::string							_root;	// pathConf(getter)
+		std::string							_method;
+		std::string							_fileBuf;
+		std::string							_fileExec;
+		std::string							_root;
 		std::fstream						_fs_file;
 		std::map<std::string, std::string>	_header;
 		
