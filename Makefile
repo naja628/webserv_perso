@@ -43,6 +43,6 @@ fclean:			clean
 re: 			fclean $(NAME)
 
 purge:
-				rm -f runtime/*
+				rm -f /tmp/webserv_*
 
 .PHONY: 		clean fclean re objs all purge
