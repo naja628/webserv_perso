@@ -69,8 +69,10 @@ void Server::launchServer(void)
 	struct sockaddr_in cli_addr;
 	socklen_t cli_addr_size = sizeof(cli_addr_size);
 
-	std::clog << "Servers are ready.\n" << "Listening on ports: ";
-	print_range(_m_ports.begin(), _m_ports.end());
+	std::clog << "Servers are ready\n";
+	for (size_t i = 0; i < _m_conf.servers().size(); ++i) {
+		_m_conf.servers()[i].info(std::clog);
+	}
 
 	while (1)
 	{
@@ -103,9 +105,9 @@ void Server::launchServer(void)
 				cur->events = worker.event_set();
 				if (!cur->events)
 				{
-					std::clog << "Closing connection" << std::endl;
 					close(cur->fd);
 					_m_con_map.erase(_m_con_map.find(cur->fd));
+					std::clog << "Closed connection | id = " << cur->fd << "\n";
 					_m_fds.erase(_m_fds.begin() + current--);
 				}
 				else 

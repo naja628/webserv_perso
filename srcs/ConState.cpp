@@ -21,6 +21,10 @@
 #include "Buf.hpp"
 #include "CgiHandler.hpp"
 
+static std::string id_stamp(int fd) {
+	return "id = " + strof(fd) + " | ";
+}
+
 // DEBUG
 //#include <iostream>
 
@@ -69,7 +73,9 @@ short ConState::_get_first_request() {
 		if (!_pconf)
 			return 0;
 
-		std::clog << "New connection on port [" << _port << "]\n";
+		std::clog 
+			<< "New connection on port [" << _port << "] |"
+			<< " id = " << _fd << "\n";
 
 		_cgi.setFilename();
 		_cgi.setConf(_pconf);
@@ -98,7 +104,7 @@ short ConState::_get_request()
 
 short ConState::_dispatch() {
 
-	std::clog << "New request: " << _pa.method() << " " << _pa.uri() << " HTTP/1.1\n";
+	std::clog << id_stamp(_fd) << "New request: " << _pa.method() << " " << _pa.uri() << " HTTP/1.1\n";
 	PathConf const* path_conf = _pconf->path_conf(_pa.uri());
 	if ( !path_conf )
 		throw HttpError(404);
@@ -373,6 +379,7 @@ short ConState::_write() {
 		case Writer::OK_FINISHED:
 			_resp_file.get().close();
 			_call_next = &ConState::_get_new_request;
+			std::clog << id_stamp(_fd) << "Response sent. Ready for new request\n";
 			return POLLIN;
 	}
 }
@@ -386,6 +393,7 @@ short ConState::_write_then_close() {
 			return POLLOUT;
 		case Writer::OK_FINISHED:
 			_resp_file.get().close();
+			std::clog << id_stamp(_fd) << "Response sent. Closing connection\n";
 			return 0;
 	}
 }
@@ -452,6 +460,8 @@ short ConState::operator() (short pollflags)
 	try {
 		_event_set = (this->*_call_next)();
 	} catch (HttpError e) {
+		std::clog << id_stamp(_fd) 
+			<< "Handling Http error [" << e << "]\n";
 		_prepare_error(e);
 		if (_chunk_streamer.status() == ChunkStreamer::DONE)
 			_call_next = &ConState::_write;

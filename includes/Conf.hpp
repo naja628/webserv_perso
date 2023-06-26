@@ -157,8 +157,7 @@ public:
 	// -1 if unset/unlimited
 	long max_body() const;
 
-	// debug
-	void print() const;
+	void info(std::ostream & out) const;
 
 private:
 	std::set<int> _ports;
@@ -187,6 +186,8 @@ public:
 	// note : can be invalidated by modifying `*this`
 	ServerConf const* get_server_conf(int port, std::string const& hostname) const;
 	MimeMap const& mime_map() const;
+	std::vector<ServerConf> const& servers() const;
+
 
 private:
 	enum DirCode { UNKNOWN = 0, PORTS, NAMES, BODY_SZ, ERRPAGE, PATH };

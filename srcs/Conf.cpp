@@ -279,7 +279,8 @@ PathConf const* Paths::get_conf (
 				conf.root() + (islash >= canon_path.size()? "" : canon_path.substr(islash));
 			return &conf;
 		}
-	} while ( ( islash = prefix.rfind('/') ) != std::string::npos);
+// 	} while ( ( islash = prefix.rfind('/') ) != std::string::npos);
+	} while (!(prefix == "" || prefix == "/"));
 	return NULL;
 }
 
@@ -318,18 +319,17 @@ long ServerConf::max_body() const {
 	return _max_body;
 }
 
-// DEBUG
-//#include <iostream>
-//void ServerConf::print() const {
-//	std::cout << "Conf:\n";
-//	std::cout << "\tports:";
-//	print_range(_ports.begin(), _ports.end());
-//	std::cout << "\tnames: ";
-//	print_range(_names.begin(), _names.end());
-//	std::cout << "\tmax_body:" << _max_body << "\n";
-//	std::cout << "\terror_pages:";
-//	print_range(_error_pages.begin(), _error_pages.end());
-//}
+void ServerConf::info(std::ostream & out) const {
+	out << "Server [" 
+		<< ( _names.empty() ? "anonymous" : *_names.begin() )
+		<< "]:\n";
+	if (_names.size() > 1) {
+		out << "\talternative names: ";
+		print_range(++_names.begin(), _names.end());
+	}
+	out << "\tports: ";
+	print_range(_ports.begin(), _ports.end());
+}
 
 /* VirtualServers */
 
@@ -465,6 +465,10 @@ ServerConf const* VirtualServers::get_server_conf(int port, std::string const& h
 		}
 	}
 	return dfl;
+}
+
+std::vector<ServerConf> const& VirtualServers::servers() const {
+	return _servers;
 }
 
 /////////////////
