@@ -124,8 +124,9 @@ short ConState::_dispatch() {
 		_chunk_streamer = ChunkStreamer(); // reset
 
 		_cgi.setMethod("POST");
+		_cgi.openFile(0);
 
-			return _read_body();
+		return _read_body();
 	}
 
 	if ( _pa.method() == "GET" )
@@ -151,7 +152,6 @@ short ConState::_dispatch() {
 
 short ConState::_read_body()
 {
-	_cgi.openFile(0);
 	try {
 		_call_next = &ConState::_read_body;
 		if (   _pa.header().count("transfer-encoding")
@@ -447,7 +447,7 @@ short ConState::operator() (short pollflags)
 		recvd = recv(_fd, &dummy, 1, MSG_PEEK);
 	}
 
-	if (pollflags && recvd <= 0)
+	if (pollflags & POLLIN && recvd <= 0)
 	{
 		return (_event_set = 0); // will close connection
 	}
