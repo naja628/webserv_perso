@@ -447,7 +447,7 @@ short ConState::operator() (short pollflags)
 		recvd = recv(_fd, &dummy, 1, MSG_PEEK);
 	}
 
-	if (recvd <= 0)
+	if (pollflags && recvd <= 0)
 	{
 		return (_event_set = 0); // will close connection
 	}
