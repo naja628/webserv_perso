@@ -25,7 +25,6 @@ static std::string id_stamp(int fd) {
 	return "id = " + strof(fd) + " | ";
 }
 
-// DEBUG
 //#include <iostream>
 
 //void print_header(HttpParser const& pa)
