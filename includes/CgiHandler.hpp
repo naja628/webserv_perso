@@ -43,7 +43,7 @@ class CgiHandler
 		std::string const& outFileName() const;
 
 	// launch
-		bool	isCgi(std::set<std::string> allowed_extensions);
+		bool	isCgi(PathConf::ExeMap const& allowed_extensions);
 		void	run();
 		bool	waitChild();
 
@@ -59,6 +59,7 @@ class CgiHandler
 		std::string							_fileBuf;
 		std::string							_fileExec;
 		std::string							_root;
+		std::string							_runcmd;
 		std::fstream						_fs_file;
 		std::map<std::string, std::string>	_header;
 		
@@ -70,7 +71,7 @@ class CgiHandler
 
 	// launch utils
 		void		_launch();
-		bool		_checkExtension(std::string path, std::set<std::string> ext);
+		bool		_checkExtension(std::string path, PathConf::ExeMap const& ext);
 		void		_exit(int fd1, int fd2);
 
 	// setters

@@ -124,14 +124,8 @@ short ConState::_dispatch() {
 		_chunk_streamer = ChunkStreamer(); // reset
 
 		_cgi.setMethod("POST");
-		_cgi.openFile(0);
 
-		try {
 			return _read_body();
-		} catch (HttpError & e) {
-			_cgi.closeFile();
-			throw ;
-		}
 	}
 
 	if ( _pa.method() == "GET" )
@@ -157,33 +151,38 @@ short ConState::_dispatch() {
 
 short ConState::_read_body()
 {
-	_call_next = &ConState::_read_body;
-	if (   _pa.header().count("transfer-encoding")
-		&& _pa.header().at("transfer-encoding") == "chunked" )
-	{
-		if ( _pconf->max_body() > 0 )
-			_chunk_streamer.set_max_size(_pconf->max_body() );
-		if ( _chunk_streamer.read_some_chunked(_in_buf, _cgi) != ChunkStreamer::DONE)
-			return POLLIN; // still streaming the body
-
-	}
-	else if ( _pa.header().count("content-length") )
-	{
-		if (_chunk_streamer.status() == ChunkStreamer::START)
+	_cgi.openFile(0);
+	try {
+		_call_next = &ConState::_read_body;
+		if (   _pa.header().count("transfer-encoding")
+				&& _pa.header().at("transfer-encoding") == "chunked" )
 		{
-			ssize_t length = from_str<int>(_pa.header().at("content-length"), HttpError(400));
-			if (length < 0)
-				throw HttpError(400);
-			if ( (_pconf->max_body() > 0) && length > _pconf->max_body() )
-				throw HttpError(413);
-			_chunk_streamer.set_chunk_size(length);
+			if ( _pconf->max_body() > 0 )
+				_chunk_streamer.set_max_size(_pconf->max_body() );
+			if ( _chunk_streamer.read_some_chunked(_in_buf, _cgi) != ChunkStreamer::DONE)
+				return POLLIN; // still streaming the body
+
 		}
+		else if ( _pa.header().count("content-length") )
+		{
+			if (_chunk_streamer.status() == ChunkStreamer::START)
+			{
+				ssize_t length = from_str<int>(_pa.header().at("content-length"), HttpError(400));
+				if (length < 0)
+					throw HttpError(400);
+				if ( (_pconf->max_body() > 0) && length > _pconf->max_body() )
+					throw HttpError(413);
+				_chunk_streamer.set_chunk_size(length);
+			}
 
-		if ( _chunk_streamer.read_some_single(_in_buf, _cgi) != ChunkStreamer::DONE)
-			return POLLIN; // still streaming the body
-		// body done
+			if ( _chunk_streamer.read_some_single(_in_buf, _cgi) != ChunkStreamer::DONE)
+				return POLLIN; // still streaming the body
+							   // body done
+		}
+	} catch (HttpError & e) {
+		_cgi.closeFile();
+		throw ;
 	}
-
 	_cgi.closeFile();
 		
 	return _prepare_page();
@@ -254,7 +253,7 @@ short ConState::_prepare_page() {
 
 	_cgi.setParser(_pa);	// dans isCgi()
 	_cgi.setRoot(locpath);	// dans isCgi()
-	if (_cgi.isCgi(path_conf->cgi_extensions()) == true)
+	if (_cgi.isCgi(path_conf->cgi_execute()) == true)
 	{
 		_cgi.run();
 		_call_next = &ConState::_wait_cgi;
@@ -441,33 +440,41 @@ void ConState::_prepare_error(HttpError e) {
 short ConState::operator() (short pollflags)
 {
 	int recvd;
-	if (pollflags & POLLIN) 
-	{
-		// TODO maybe problem reading in advance, when polling for POLLIN
-		// to be able to detect client closing connections
-		// when the buffer becomes full
-		// cf bookmarked stack-overflow for maybe solution
+	if (_event_set & POLLIN && pollflags & POLLIN) { // normal read
 		recvd = _in_buf.read_more(_fd);
-
-		if (recvd <= 0)
-		{
-			return (_event_set = 0); // will close connection
-		}
+	} else if (pollflags & POLLIN) { // check if client has closed 
+		char dummy;
+		recvd = recv(_fd, &dummy, 1, MSG_PEEK);
 	}
-	if (! (pollflags & _event_set) ) // not what we need now
-		return _event_set;
 
-	try {
-		_event_set = (this->*_call_next)();
-	} catch (HttpError e) {
-		std::clog << id_stamp(_fd) 
-			<< "Handling Http error [" << e << "]\n";
-		_prepare_error(e);
-		if (_chunk_streamer.status() == ChunkStreamer::DONE)
-			_call_next = &ConState::_write;
-		else 
-			_call_next = &ConState::_write_then_close;
-		return (_event_set = POLLOUT);
+	if (recvd <= 0)
+	{
+		return (_event_set = 0); // will close connection
+	}
+
+// 	if (pollflags & POLLIN) 
+// 	{
+// 		// TODO maybe problem reading in advance, when polling for POLLIN
+// 		// to be able to detect client closing connections
+// 		// when the buffer becomes full
+// 		// cf bookmarked stack-overflow for maybe solution
+// 		recvd = _in_buf.read_more(_fd);
+// 
+// 	}
+
+	if (pollflags & _event_set) { // event we're looking for
+		try {
+			_event_set = (this->*_call_next)();
+		} catch (HttpError e) {
+			std::clog << id_stamp(_fd) 
+				<< "Handling Http error [" << e << "]\n";
+			_prepare_error(e);
+			if (_chunk_streamer.status() == ChunkStreamer::DONE)
+				_call_next = &ConState::_write;
+			else 
+				_call_next = &ConState::_write_then_close;
+			return (_event_set = POLLOUT);
+		}
 	}
 	return _event_set;
 }

@@ -52,12 +52,12 @@ int PathConf::_name_to_mask(std::string const& opt_name) {
 	const int N = 8;
 	std::string const names[N] = {
 		"accepted_methods", "redirect", "root", "directory_listing",
-		"index", "cgi_extensions", "uploads_directory", "path"
+		"index", "cgi_execute", "uploads_directory", "path"
 	};
 	//
 	int const masks[N] = { 
 		METHODS, REDIR, ROOT, DIRLIST, 
-		INDEX, CGIEXT, UPDIR, SUBPATH
+		INDEX, CGIEXE, UPDIR, SUBPATH
 	};
 	//
 	std::map<std::string, int> m;
@@ -110,8 +110,8 @@ std::string const& PathConf::index() const {
 	return _get(&PathConf::_index, INDEX);
 }
 
-SSet const& PathConf::cgi_extensions() const {
-	return _get(&PathConf::_cgi_extensions, CGIEXT);
+PathConf::ExeMap const& PathConf::cgi_execute() const {
+	return _get(&PathConf::_cgi_execute, CGIEXE);
 }
 
 std::string const& PathConf::uploads_directory() const {
@@ -160,12 +160,30 @@ static std::istream & read_quoted(
 
 
 /* Paths */
+Paths::Paths() : _path_map() {}
 
-PathConf & Paths::_parse_one(std::istream & in) {
+Paths::Paths(Paths const& other) : _path_map(other._path_map) {
+	std::map<PathConf const*, PathConf *> pmap;
+	typedef std::map<std::string, PathConf>::const_iterator It;
+	for (It it = other._path_map.begin(); it != other._path_map.end(); ++it) {
+		PathConf & elt = _path_map[it->first] = it->second;
+		pmap[&(it->second)] = &elt;
+		if (elt._super)
+			elt._super = pmap[elt._super];
+	}
+}
+
+Paths & Paths::operator=(Paths other) {
+	using std::swap;
+	swap(*this, other);
+	return *this;
+}
+
+PathConf & Paths::_parse_one(std::istream & in, std::string super_path) {
 	// we should have just read 'path' from outside
 	std::string mapped_path;
 	read_quoted(in, mapped_path);
-	mapped_path = simplify_path(mapped_path);
+	mapped_path = simplify_path(super_path + "/" + mapped_path);
 	// TODO maybe handle relative paths (from super path directive)
 
 	PathConf & conf = _path_map[mapped_path];
@@ -186,12 +204,12 @@ PathConf & Paths::_parse_one(std::istream & in) {
 				throw ParsingException(in, "unknown directive " + directive);
 				break;
 			case PathConf::SUBPATH:
-				sub = &_parse_one(in);
+				sub = &_parse_one(in, mapped_path);
 				sub->_super = &conf;
 				break;
 
 			case PathConf::METHODS:
-				conf._accepted_methods = _read_set(in);
+				_read_set(in, conf._accepted_methods);
 				break;
 			case PathConf::REDIR:
 				conf._redirect.from = mapped_path;
@@ -206,8 +224,8 @@ PathConf & Paths::_parse_one(std::istream & in) {
 			case PathConf::INDEX:
 				conf._index = _read_path(in, mapped_path);
 				break;
-			case PathConf::CGIEXT:
-				conf._cgi_extensions = _read_set(in);
+			case PathConf::CGIEXE:
+				_read_cgiexe(in, conf._cgi_execute);
 				break;
 			case PathConf::UPDIR:
 				conf._uploads_directory = _read_path(in, mapped_path);
@@ -215,21 +233,18 @@ PathConf & Paths::_parse_one(std::istream & in) {
 				// impossible path
 			default:
 				throw ParsingException(in, "unexpected error");
-
 		}
 	}
 	return conf;
 } ////////
 
-SSet Paths::_read_set(std::istream & in) {
-	SSet sset;
+void Paths::_read_set(std::istream & in, SSet & set) {
 	std::string elem;
 	while ( !expect(in, ";") ) {
 		if ( !read_quoted(in, elem) )
 			throw ParsingException(in, "bad syntax");
-		sset.insert(elem);
+		set.insert(elem);
 	}
-	return sset;
 }
 
 std::string Paths::_read_single(std::istream & in) {
@@ -256,6 +271,20 @@ std::string Paths::_read_path(std::istream & in, std::string const& prefix) {
 		return simplify_path(result);
 	else // relative path
 		return simplify_path(prefix + "/" + result);
+}
+
+void Paths::_read_cgiexe(std::istream & in, PathConf::ExeMap & map) {
+	std::string runcmd;
+	if (! read_quoted(in, runcmd) )
+		throw ParsingException(in, "bad quoting");
+	if (runcmd.size() == 0 || runcmd[0] != '/')
+		throw ParsingException(in, "expected absolute (system-wise) path");
+	while ( !expect(in, ";") ) {
+		std::string ext;
+		if (! read_quoted(in, ext) )
+			throw ParsingException(in, "bad quoting");
+		map[ext] = runcmd;
+	}
 }
 
 PathConf const* Paths::get_conf (
@@ -380,7 +409,7 @@ void VirtualServers::parse_conf(std::istream & in) {
 					_read_ports(in, conf);
 					break;
 				case NAMES:
-					conf._names = Paths::_read_set(in);
+					Paths::_read_set(in, conf._names);
 					break;
 				case BODY_SZ:
 					in >> conf._max_body;
@@ -393,7 +422,7 @@ void VirtualServers::parse_conf(std::istream & in) {
 					_read_errpage(in, conf);
 					break;
 				case PATH:
-					conf._paths._parse_one(in);
+					conf._paths._parse_one(in, "/");
 					break;
 			}
 		}

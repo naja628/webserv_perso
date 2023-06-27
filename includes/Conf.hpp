@@ -9,10 +9,6 @@
 #include <vector>
 #include <exception>
 
-// TODO maybe comments
-// maybe add error for multiple directive with same name
-// (except `error_page`)
-
 class ParsingException: std::exception {
 private:
 	std::string _errmsg;
@@ -33,11 +29,10 @@ typedef std::set<std::string> SSet;
 
 //////////////////////////////
 class PathConf {
-// TODO maybe add support for relative paths
-// problem: not always clear what they should mean
-//
-// TODO add match_path field or something
+
 public:
+	typedef std::map<std::string, std::string> ExeMap; 
+
 	/* CTOR */
 	PathConf(PathConf * super = NULL);
 
@@ -50,19 +45,15 @@ public:
 	std::string const& root() const; // nginx alias not nginx root
 	bool directory_listing() const;
 	std::string const& index() const;
-	SSet const& cgi_extensions() const;
+	ExeMap const& cgi_execute() const;
 	std::string const& uploads_directory() const;
-
-	// utils
-// 	bool is_cgi(std::string path) const; // TODO either rm or handle
-// 	                                     // cgi in the middle of path
 
 	friend class Paths;
 
 private:
 	static const int 
 		METHODS = 1, REDIR = 2, ROOT = 4, DIRLIST = 8, 
-		INDEX = 16, CGIEXT = 32, UPDIR = 64, SUBPATH = -1;
+		INDEX = 16, CGIEXE = 32, UPDIR = 64, SUBPATH = -1;
 
 	// default conf global object
 	static PathConf const _dfl_conf;
@@ -87,7 +78,7 @@ private:
 	std::string _root;
 	bool _directory_listing;
 	std::string _index;
-	SSet _cgi_extensions;
+	ExeMap _cgi_execute;
 	std::string _uploads_directory;
 
 	PathConf * _super; // config to default to for unset 'options'
@@ -106,7 +97,10 @@ private:
 class Paths {
 public:
 
-	// default ctor ok
+	Paths();
+	Paths(Paths const& other);
+	Paths & operator=(Paths other);
+	// default dtor ok
 	
 	// find the configuration for the `path` (normally uri from http request)
 	// returns a pointer the corresponding `PathConf` object
@@ -120,13 +114,14 @@ private:
 	std::map<std::string, PathConf> _path_map; // map of uris to conf objects
 											   // (match longest prefix)
 	
-	PathConf & _parse_one(std::istream & in);
+	PathConf & _parse_one(std::istream & in, std::string super_path);
 
 	// reading utils
-	static SSet _read_set(std::istream & in);
+	static void _read_set(std::istream & in, SSet & set);
 	static std::string _read_single(std::istream & in);
 	static bool _read_yesno(std::istream & in);
 	static std::string _read_path(std::istream & in, std::string const& prefix);
+	static void _read_cgiexe(std::istream & in, PathConf::ExeMap & map);
 
 	friend class VirtualServers;
 };

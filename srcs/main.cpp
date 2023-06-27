@@ -20,6 +20,7 @@ int main(int ac, char **av, char ** env)
 	} 
 
 	signal(SIGINT, sighook_quit);
+	signal(SIGPIPE, SIG_IGN); // SIGPIPE should be super rare
  	// basic checks
  	std::ifstream conf_stream;
  	if (ac < 2)

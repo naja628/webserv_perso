@@ -92,6 +92,7 @@ void Server::launchServer(void)
 
 				_m_addFd(cli_sock);
 				_m_con_map[cli_sock].init(cli_sock, &_m_conf, _m_ports[current]);
+				std::cerr << "New connection on port" << cli_addr.sin_port << "\n";
 			}
 		}
 
@@ -114,6 +115,8 @@ void Server::launchServer(void)
 					cur->events |= POLLIN; // to detect closes
 			}
 		}
+		// TODO rm
+		std::cerr << "active connections: " << _m_fds.size() - _m_NPorts << "\n";
 		
 	}
 }

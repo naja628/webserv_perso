@@ -1,10 +1,8 @@
-#!/usr/bin/python3
-
 import cgi
 import os
 import sys
 
-print("CGI PYTHON", file=sys.stderr)
+#print("CGI PYTHON", file=sys.stderr)
 def html_response(title, body, status = 200):
     print('Content-type: text/html')
     print('Status:', status)
@@ -29,7 +27,7 @@ if 'file' in form:
     if filename := file_item.filename:
         upload_path = os.path.join(os.environ["PATH_TRANSLATED"], file_item.filename)
         #
-        print("Upload path:", upload_path, file = sys.stderr)
+        #print("Upload path:", upload_path, file = sys.stderr)
         try:
             with open(upload_path, 'xb') as file:
                 file.write(file_item.file.read())

@@ -210,7 +210,7 @@ void	CgiHandler::run()
 		_launch();
 }
 
-bool	CgiHandler::isCgi(std::set<std::string> ext)
+bool	CgiHandler::isCgi(PathConf::ExeMap const& ext)
 {
 	std::string	path = _getPath();
 	if (path == "")
@@ -257,27 +257,52 @@ void	CgiHandler::_launch()
 	else
 		_root.erase(0, pathDir.size());
 
-	char *tab[2];
-	tab[0] = strdup(path.substr(path.find_last_of('/') + 1).c_str());
-	tab[1] = NULL;
+	// find runcmd (eg '/bin/usr/python') corresponding to extension (eg '.py')
+// 	PathConf *path_conf; = _conf->path_conf(path);
+// 	if ( !(path_conf = _conf->path_conf(path)) ) { // impossible i think
+// 		freeTab(envTab);
+// 		throw HttpError(500);
+// 	}
+// 	std::string ext 
+// 		= path.rfind('.') == -1 ? "" : path.substr(path.rfind('.'));
+// 	PathConf::ExeMap const& cgiexe = path_conf->cgi_execute();
+// 	std::string runcmd = (cgiexe.count(ext) ? cgiexe.at(ext) : "");
 
-	execve(path.substr(path.find_last_of('/') + 1).c_str(), tab, envTab);
+	char * tab[3];
+// 	tab[0] = _runcmd.data() + (_runcmd.rfind('/') + 1);
+// 	tab[1] = path.data() + (path.rfind('/') + 1);
+	tab[0] = strdup(_runcmd.substr(_runcmd.rfind('/') + 1).data());
+	tab[1] = strdup(path.substr(path.find_last_of('/') + 1).data());
+	tab[2] = NULL;
+
+// 	execve(path.substr(path.find_last_of('/') + 1).c_str(), tab, envTab);
+	execve(_runcmd.data(), tab, envTab);
 
 	free(tab[0]);
+	free(tab[1]);
 	_freeTab(envTab);
 	_exit(fd1, fd2);
 }
 
-bool	CgiHandler::_checkExtension(std::string path, std::set<std::string> ext)
+bool	CgiHandler::_checkExtension(std::string path, PathConf::ExeMap const& ext)
 {
-	if (ext.count("ALL"))
+	// also sets `_runcmd`
+	if (ext.count("ALL")) {
+		_runcmd = ext.at("ALL");
 		return true;
+	}
 
 	size_t	i = path.rfind('.');
-	if (i == std::string::npos)
+	if (i == std::string::npos) {
 		return false;
-	else 
-		return ext.count(path.substr(i));
+	} else {
+		try {
+			_runcmd = ext.at(path.substr(i));
+			return true;
+		} catch (...) {
+			return false;
+		}
+	}
 }
 
 void	CgiHandler::_exit(int fd1, int fd2)
@@ -289,7 +314,6 @@ void	CgiHandler::_exit(int fd1, int fd2)
 
 	exit(EXIT_FAILURE);
 }
-
 
 
 /****************************************************/
