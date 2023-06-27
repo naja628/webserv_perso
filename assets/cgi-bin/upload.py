@@ -15,7 +15,7 @@ def html_response(title, body, status = 200):
     print('</html>')
 
 def respond_ok(filename):
-    html_response(" Success !", "file '" + filename + "'uploaded successfully", 201)
+    html_response(" Success !", f"File {filename} uploaded successfully", 201)
 
 def respond_failure(fail_msg):
     html_response(" Failure :( ", fail_msg)
@@ -33,7 +33,7 @@ if 'file' in form:
                 file.write(file_item.file.read())
             respond_ok(filename)
         except FileExistsError:
-            respond_failure("File {0} already exists".format(filename))
+            respond_failure(f"File {filename} already exists")
         except FileNotFoundError:
             respond_failure("Subdir does not exist")
         except:

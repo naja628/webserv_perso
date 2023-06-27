@@ -132,6 +132,8 @@ ssize_t	CgiHandler::bodyInFile(Buf & buf, size_t rem_chunk_size)
 
 	std::streampos	startPos = _fs_file.tellg();
 	_fs_file.write(buf.pos, std::min(rem_chunk_size, data_size));
+	if (_fs_file.fail() && !_fs_file.eof())
+		throw HttpError(500);
 	std::streampos	endPos = _fs_file.tellg();
 
 	return (endPos - startPos);

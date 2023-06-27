@@ -452,16 +452,6 @@ short ConState::operator() (short pollflags)
 		return (_event_set = 0); // will close connection
 	}
 
-// 	if (pollflags & POLLIN) 
-// 	{
-// 		// TODO maybe problem reading in advance, when polling for POLLIN
-// 		// to be able to detect client closing connections
-// 		// when the buffer becomes full
-// 		// cf bookmarked stack-overflow for maybe solution
-// 		recvd = _in_buf.read_more(_fd);
-// 
-// 	}
-
 	if (pollflags & _event_set) { // event we're looking for
 		try {
 			_event_set = (this->*_call_next)();

@@ -184,7 +184,6 @@ PathConf & Paths::_parse_one(std::istream & in, std::string super_path) {
 	std::string mapped_path;
 	read_quoted(in, mapped_path);
 	mapped_path = simplify_path(super_path + "/" + mapped_path);
-	// TODO maybe handle relative paths (from super path directive)
 
 	PathConf & conf = _path_map[mapped_path];
 

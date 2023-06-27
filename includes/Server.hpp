@@ -6,7 +6,7 @@
 /*   By: mbucci <marvin@42.fr>                      +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2023/04/24 16:39:14 by mbucci            #+#    #+#             */
-/*   Updated: 2023/06/26 17:10:51 by mdelforg         ###   ########.fr       */
+/*   Updated: 2023/06/27 12:00:57 by mdelforg         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -24,7 +24,6 @@ class Server
 {
 	public:
 		Server(VirtualServers const& conf);
-		// TODO: add config constructor
 		virtual ~Server();
 
 		void launchServer();

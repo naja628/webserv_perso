@@ -11,7 +11,7 @@ public:
 	enum Status 
 	{ START = 0, CHUNK_PREFIX = 0, CHUNK_PAYLOAD, CRLF, TRAILER, DONE };
 
-	ChunkStreamer(int fd = -1); // TODO handle write errors
+	ChunkStreamer(int fd = -1);
 
 	Status status() const;
 

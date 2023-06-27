@@ -62,9 +62,6 @@ typedef BufAdaptor BufType;
 class HttpParser { // Class used to parse an http request
 				   // doesn't handle the parsing of the `body`
 
-	// TODO maybe forbid non printable characters, etc
-	// TODO maybe handle leading newlines before a request
-
 public:
 	HttpParser(std::string const& newline = "\r\n");
 	// doesn't manage any raw resource so will behave canonically 
