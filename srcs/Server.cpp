@@ -90,12 +90,8 @@ void Server::launchServer(void)
 			if (_m_fds[current].revents & POLLIN)
 			{
 				cli_sock = accept(_m_fds[current].fd, (struct sockaddr*) &cli_addr, &cli_addr_size);
-//				std::cerr << "Port = " << cli_addr.sin_port << '\n';
 				if (cli_sock == -1)
-				{
-					perror("Accept error: ");
 					continue;
-				}
 
 				_m_addFd(cli_sock);
 				_m_con_map[cli_sock].init(cli_sock, &_m_conf, _m_ports[current]);
@@ -122,7 +118,6 @@ void Server::launchServer(void)
 					cur->events |= POLLIN; // to detect closes
 			}
 		}
-//		std::cerr << "Active connections = " << _m_fds.size() - _m_NPorts << '\n';
 	}
 }
 
