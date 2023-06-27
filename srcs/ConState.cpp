@@ -432,7 +432,7 @@ void ConState::_prepare_error(HttpError e) {
 		add_allowed_methods(_wr, _pconf->path_conf(_pa.uri()));
 
 	std::string const* error_path;
-	if ( (error_path = _pconf->error_page(e)) ) {
+	if ( _pconf && (error_path = _pconf->error_page(e)) ) {
 		std::string translated_path = _pconf->translate_path(*error_path);
 		_resp_file.get().open(translated_path.data());
 		if (!_resp_file.get().is_open())
