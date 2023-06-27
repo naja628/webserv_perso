@@ -22,6 +22,12 @@ def respond_failure(fail_msg):
 
 form = cgi.FieldStorage()
 
+def try_open_and_respond(uppath, file_item):
+    with open(upload_path, 'xb') as file:
+        file.write(file_item.file.read())
+    respond_ok(filename)
+
+
 if 'file' in form:
     file_item = form['file']
     if filename := file_item.filename:
@@ -29,13 +35,15 @@ if 'file' in form:
         #
         #print("Upload path:", upload_path, file = sys.stderr)
         try:
-            with open(upload_path, 'xb') as file:
-                file.write(file_item.file.read())
-            respond_ok(filename)
+            try_open_and_respond(upload_path, file_item)
         except FileExistsError:
             respond_failure(f"File {filename} already exists")
         except FileNotFoundError:
-            respond_failure("Subdir does not exist")
+            try: 
+                os.makedirs(os.path.dirname(upload_path))
+                try_open_and_respond(upload_path, file_item)
+            except OSError:
+                respond_failure("Could not create subdir")
         except:
             respond_failure("Unexpected error")
     else:
