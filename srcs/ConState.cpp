@@ -251,13 +251,19 @@ short ConState::_prepare_page() {
 		throw HttpError(404);
 	}
 
-	_cgi.setParser(_pa);	// dans isCgi()
-	_cgi.setRoot(locpath);	// dans isCgi()
+	_cgi.setParser(_pa);
+	_cgi.setRoot(locpath);
 	if (_cgi.isCgi(path_conf->cgi_execute()) == true)
 	{
 		_cgi.run();
 		_call_next = &ConState::_wait_cgi;
 		return (_wait_cgi());
+	}
+	else if (_pa.method() == "POST")
+	{
+		_wr.set_status(204);
+		_call_next = &ConState::_write;
+		return POLLOUT;
 	}
 
 	// response common part:

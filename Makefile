@@ -1,7 +1,6 @@
 NAME		=	webserv
 CXX			=	c++
-#CXXFLAGS	=	-Wall -Wextra -Werror -std=c++98 -I $(INCLUDES) 
-CXXFLAGS	=	-Wall -Wextra -Werror -std=c++98 -I $(INCLUDES) -g3
+CXXFLAGS	=	-Wall -Wextra -Werror -std=c++98 -I $(INCLUDES) 
 OBJDIR		=	./objs/
 SRCDIR		=	./srcs/
 INCLUDES	=	./includes/

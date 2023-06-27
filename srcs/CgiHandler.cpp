@@ -204,6 +204,8 @@ void	CgiHandler::run()
 {
 	if (_pid > 0)
 		kill(_pid, SIGTERM);
+	if (access(_runcmd.data(), X_OK) == -1)
+		throw HttpError(500);
 	_stopwatch = clock();
 	_pid = fork();
 	if (_pid < 0)
@@ -259,25 +261,11 @@ void	CgiHandler::_launch()
 	else
 		_root.erase(0, pathDir.size());
 
-	// find runcmd (eg '/bin/usr/python') corresponding to extension (eg '.py')
-// 	PathConf *path_conf; = _conf->path_conf(path);
-// 	if ( !(path_conf = _conf->path_conf(path)) ) { // impossible i think
-// 		freeTab(envTab);
-// 		throw HttpError(500);
-// 	}
-// 	std::string ext 
-// 		= path.rfind('.') == -1 ? "" : path.substr(path.rfind('.'));
-// 	PathConf::ExeMap const& cgiexe = path_conf->cgi_execute();
-// 	std::string runcmd = (cgiexe.count(ext) ? cgiexe.at(ext) : "");
-
 	char * tab[3];
-// 	tab[0] = _runcmd.data() + (_runcmd.rfind('/') + 1);
-// 	tab[1] = path.data() + (path.rfind('/') + 1);
 	tab[0] = strdup(_runcmd.substr(_runcmd.rfind('/') + 1).data());
 	tab[1] = strdup(path.substr(path.find_last_of('/') + 1).data());
 	tab[2] = NULL;
 
-// 	execve(path.substr(path.find_last_of('/') + 1).c_str(), tab, envTab);
 	execve(_runcmd.data(), tab, envTab);
 
 	free(tab[0]);
