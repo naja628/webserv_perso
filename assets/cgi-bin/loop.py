@@ -1,5 +1,7 @@
 import sys
+import time
 
 while True:
-    print("vous etes bo", file=sys.stderr)
+    print("To infinity and beyond!", file = sys.stderr)
+    time.sleep(0.5)
 

@@ -10,7 +10,7 @@
 # include "HttpParser.hpp"
 # include "Conf.hpp"
 
-# define CGI_TIMEOUT 1
+# define CGI_TIMEOUT 5
 
 class CgiHandler
 {
