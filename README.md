@@ -4,7 +4,7 @@ It is a school project of 19 School we worked on as a team with Matteo Bucci and
 This is my personal fork of it.  
 
 ## Build
-On Unix system just `make`.  
+On Unix systems just `make`.  
 Windows not supported.
 
 ## Run
@@ -14,7 +14,9 @@ Or
 
 The paths in the conf are relative and the default conf assumes you are running the server from the root of the repo.
 
-After that you should be able to connect to `http://localhost:4242/` or `http://localhost:<port-you-configured>/`.  
+After that you should be able to connect to `http://localhost:4242/`  
+or `http://localhost:<port-you-configured>/`.  
+
 Use 'Ctrl-C' to exit.
 
 ## Config
